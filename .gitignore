@@ -1,0 +1,8 @@
+# Per-machine configuration and secrets — never commit these.
+d365.config.json
+d365.secrets.json
+*.secrets.json
+
+# Local data: snapshots, reports, pending writes, audit trail (hundreds of MB).
+.d365/
+node_modules/
