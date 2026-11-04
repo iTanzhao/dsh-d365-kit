@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "title": "D365 Toolkit",
+    "description": "Developer and deployment toolkit for Dynamics 365 CE: metadata, layers, migration risk, code checks, contract drift and environment health."
+  },
+  "tools": {
+    "d365_envs": {
+      "title": "Environments",
+      "description": "List configured environments, credential status and connectivity"
+    },
+    "d365_metadata": {
+      "title": "Metadata",
+      "description": "Query entities, attributes, forms, views, plugins and solutions by resource"
+    },
+    "d365_layers": {
+      "title": "Solution layers",
+      "description": "See which solutions cover a component and which layer is active"
+    },
+    "d365_sync": {
+      "title": "Sync snapshot",
+      "description": "Pull environment metadata into a local snapshot and record completeness"
+    },
+    "d365_diff": {
+      "title": "Diff snapshots",
+      "description": "Compare two snapshots: additions, deletions and field-level edits"
+    },
+    "d365_configure": {
+      "title": "Configure environments",
+      "description": "List, save, remove or test environment definitions"
+    },
+    "d365_write": {
+      "title": "Metadata changes",
+      "description": "Plan option values, attributes, table names and view columns, then apply after approval"
+    },
+    "d365_migrate": {
+      "title": "Migration risk",
+      "description": "Assess importing a solution elsewhere: shadowing, missing components, lost option values"
+    },
+    "d365_code_check": {
+      "title": "Code change check",
+      "description": "Read a GitLab MR and check whether script and plugin changes will run in the target environment"
+    },
+    "d365_refs": {
+      "title": "References",
+      "description": "Which forms, views and flows use a field, which forms load a script, which steps a plugin has"
+    },
+    "d365_data": {
+      "title": "Query data",
+      "description": "Count, group or sample business records (requires environment permission)"
+    },
+    "d365_data_write": {
+      "title": "Write data",
+      "description": "Create or update one business record after approval (requires environment permission)"
+    },
+    "d365_contract": {
+      "title": "Contract drift",
+      "description": "Check plugin registrations, form scripts and sitemaps across environments, with waivers"
+    },
+    "d365_health": {
+      "title": "Environment health",
+      "description": "Suspended and failed jobs, running imports and publishes, recently installed solutions"
+    },
+    "d365_reports": {
+      "title": "Local data",
+      "description": "Inspect local artifact usage, clean up by retention policy or compact snapshots"
+    }
+  }
+}

@@ -1,0 +1,113 @@
+# 版本记录
+
+**[English](CHANGELOG.md)** | 简体中文
+
+版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
+
+## 0.22.1
+
+按 npm 包的要求补齐。
+
+- `package.json` 增加 `repository`、`homepage`、`bugs`、`keywords`、`author` 与 `publishConfig.access: public`，npm 页面上不会是一片空白；
+- 文档把 npm 装法提到第一位（`install_bundle target="dsh-d365-kit@<版本>"`），Git 与本地目录作备选；`PUBLISH.md` 补了公网 npm 与内网 registry 两种 `npm publish` 写法。
+
+## 0.22.0
+
+配置可移植。
+
+- Handler 检查不再内置项目前缀：`handlerPrefixes` 默认为空，改从源环境的未受管解决方案推断（占多数的发布者前缀，再加 `new_`）。合作方与示例解决方案被排除——它们压缩过的脚本会让每个 Handler 都像缺失；
+- 漂移报告与工具输出会说明用了哪些前缀、来自配置还是自动推断；
+- `d365.config.example.json` 增加 `handlerPrefixes`。
+
+已在真实环境验证：用自动推断出的前缀，Handler 检查结果与原先写死的前缀完全一致（同样 14 条）。
+
+## 0.21.0
+
+发布整理版。
+
+- 文档重组：README 作为入口，新增 `docs/`（安装、工具参考、场景、权限、检查规则、故障排查、结构）与 `examples/`；
+- 新增 `CHANGELOG.md`、根目录 `.gitignore`；
+- 每份文档都有中英两版：`README.md` / `README.zh-CN.md`、`INSTALL.md` / `INSTALL.zh-CN.md`、`CHANGELOG.md` / `CHANGELOG.zh-CN.md`、`docs/en/` / `docs/zh/`（文件名一致）、`examples/prompts.en.md` / `examples/prompts.zh-CN.md`，每篇顶部都有语言切换；
+- `d365.config.example.json` 补齐权限、保留策略、GitLab 段；
+- `package.json` 的 `files` 加入文档与示例；
+- 采用 MIT 许可证（`LICENSE` 与 `package.json` 的 `"license": "MIT"`）。
+
+代码与 0.20.0 一致，无行为变更。
+
+## 0.20.0
+
+改名为 `dsh-d365-kit`。
+
+- 包名、bundle entry id、`index.js` 的 `name`、`client.js` 的模块 id 统一为 `dsh-d365-kit`；
+  后两个是运行时自报名字，漏改会让加载器把同一模块执行两次，报 `duplicate factory registration` 并让整个设置页消失；
+- 设置页标题改为「D365 工具箱 / D365 Toolkit」，描述覆盖读、写、检查三类能力；
+- `locale/{zh,en}.json` 的 `tools` 补到 15 条；
+- 新增 `INSTALL.md`；`cordis.patch.yml` 注释恢复 UTF-8。
+
+## 0.19.1
+
+审查后的四项修复。
+
+- `/write/cancel` 检查计划状态：非 `pending` 一律 409，不再能删掉正在执行的计划；
+- `/write/publish` 重新校验写权限与环境空闲，忙时返回 409 而不是原始 429；
+- 删除文件的阻断只在确实还有表单引用时报；
+- JS 引用分析拆成「字段 / 列 / 需人工判断」三组，字段缺失按字段聚合：所有表单都没有 = 阻断，只有部分没有 = 警告。
+
+## 0.19.0
+
+- `executePlan` 增加计划状态机 `pending → running → done/failed`，第一次写入前落 `running`；工具与设置页都拒绝非 `pending` 计划；
+- 重试策略按方法区分：`GET`/`HEAD` 在网络错误与 5xx 上重试，`POST`/`PATCH`/`DELETE` 只在 429 时重试；
+- 表单 Handler 检查收敛：只看项目脚本、先查自己的库、预算 400 个脚本，误报从 306 条降到 14 条；
+- `d365_reports` 的总数改用磁盘统计，截断时明确标注；
+- 健康检查不再渲染空的失败原因。
+
+## 0.18.0
+
+数据治理。
+
+- 保留策略：快照 / 报告 / diff / 查询留证 / 变更记录各有份数与天数上限，写产物后自动清理；
+- `d365_reports` 增加 `cleanup`（默认预演）与 `compact`（缩进 JSON 压成单行）；
+- 设置页新增「数据」标签：占用、每类明细、预演与执行、压缩；
+- 快照写入改为单行 JSON，实测四份快照省 68 MB；
+- 修复设置页某路由未声明请求体模式导致 GET 返回裸 400 的问题。
+
+## 0.17.0
+
+- 契约豁免（`waivers.json`，必须有过期时间）与漂移趋势（`contract-history.json`）；
+- 契约检查补充表单引用的 Web 资源、站点地图、表单 Handler；
+- 新增 `d365_health`（挂起/失败作业、正在进行的导入发布）；
+- 新增 `d365_reports`（产物索引）；
+- 同一 `message|stage` 多步骤时提示 rank 冲突；JS 取值写法扩到 9 种；
+- 快照过期提示、权限「复制到其他环境」。
+
+## 0.16.0
+
+契约矩阵与漂移引擎 `d365_contract`：程序集、插件类型、步骤（消息 + stage + mode）、选项值。
+
+## 0.14.0 – 0.15.0
+
+- `data.write` 与 `d365_data_write`：新建/修改业务记录，需授权且每次确认，审计不落值；
+- `d365_code_check` 增加 C# 分支：程序集精确匹配、类型/步骤/镜像/过滤属性核对，共享工程降为警告。
+
+## 0.11.0 – 0.13.0
+
+- `d365_code_check`：GitLab MR → Web 资源 → 表单字段/Handler 核对，输出阻断/警告/人工确认；
+- 设置页新增 GitLab 标签（地址、默认项目、只读令牌、连通性测试）；
+- `d365_refs`：字段 / Web 资源 / 程序集的反向索引；
+- `d365_data`：count / group by / sample，受 `data.read` 管控。
+
+## 0.7.0 – 0.10.0
+
+- 设置页改为六标签（环境、权限、计划、数据、GitLab、常规），语言跟随 DSH；
+- 执行前检查：环境正在导入/发布时拒绝写入；
+- 只发布受影响的组件（`PublishXml` 而非 `PublishAllXml`），后台执行并记录结果；
+- 迁移评估 `d365_migrate`：层遮蔽、缺失、选项值丢失、版本与受管状态。
+
+## 0.1.0 – 0.6.0
+
+- 元数据查询（19 类资源）、多环境对齐；
+- 解决方案层 `d365_layers`（虚拟实体，必须组件 id + 类型）；
+- 快照 `d365_sync` 与对比 `d365_diff`（manifest 记录完整性、噪声过滤）；
+- 环境配置与设置页；
+- 写入能力：选项集增/改/删值、字段增/改/删、表显示名、系统视图列；计划 → 人工确认 → 执行 → 审计；
+- 修掉一批真实环境差异：`organization` 列缺失、元数据端点不支持 `$top`/`$orderby`、换用户后令牌缓存未失效、层表必须带类型。

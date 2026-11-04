@@ -1,0 +1,60 @@
+{
+  "name": "dsh-d365-kit",
+  "version": "0.22.1",
+  "type": "module",
+  "description": "Dynamics 365 CE developer and deployment toolkit for DSH: metadata, layers, snapshots, migration risk, code checks, contract drift and environment health.",
+  "license": "MIT",
+  "author": "iTanzhao",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iTanzhao/dsh-d365-kit.git"
+  },
+  "homepage": "https://github.com/iTanzhao/dsh-d365-kit#readme",
+  "bugs": {
+    "url": "https://github.com/iTanzhao/dsh-d365-kit/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dynamics-365",
+    "dataverse",
+    "crm",
+    "metadata",
+    "deployment"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/*.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "INSTALL.md",
+    "INSTALL.zh-CN.md",
+    "CHANGELOG.md",
+    "CHANGELOG.zh-CN.md",
+    "docs/**/*.md",
+    "examples/**",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "title": "D365 工具箱",
+    "description": "Dynamics 365 CE 的开发与部署助手：元数据、解决方案层、迁移风险、代码改动检查、契约漂移、环境健康。"
+  },
+  "tools": {
+    "d365_envs": {
+      "title": "环境清单",
+      "description": "列出已配置环境、凭据状态与连通性"
+    },
+    "d365_metadata": {
+      "title": "元数据查询",
+      "description": "按类别查询实体、字段、表单、视图、插件、解决方案等"
+    },
+    "d365_layers": {
+      "title": "解决方案层",
+      "description": "查看组件被哪些解决方案覆盖、当前生效的是哪一层"
+    },
+    "d365_sync": {
+      "title": "同步快照",
+      "description": "把环境元数据拉成本地快照并记录采集完整度"
+    },
+    "d365_diff": {
+      "title": "快照对比",
+      "description": "比较两份快照的新增、删除与字段级修改"
+    },
+    "d365_configure": {
+      "title": "环境配置",
+      "description": "读写环境清单：列出、保存、删除或测试连接"
+    },
+    "d365_write": {
+      "title": "元数据变更",
+      "description": "准备选项值、字段、表名与视图列的修改计划，确认后执行"
+    },
+    "d365_migrate": {
+      "title": "迁移评估",
+      "description": "评估解决方案导入其它环境的风险：遮蔽、缺失、选项值丢失"
+    },
+    "d365_code_check": {
+      "title": "代码改动检查",
+      "description": "读 GitLab MR，检查脚本与插件改动发到目标环境能否运行"
+    },
+    "d365_refs": {
+      "title": "引用反查",
+      "description": "字段被哪些表单/视图/流程引用，Web 资源被谁加载，程序集有哪些步骤"
+    },
+    "d365_data": {
+      "title": "业务数据查询",
+      "description": "统计、分组或抽样读取业务记录（需环境授权）"
+    },
+    "d365_data_write": {
+      "title": "业务数据写入",
+      "description": "新建或修改一条业务记录，确认后执行（需环境授权）"
+    },
+    "d365_contract": {
+      "title": "契约漂移",
+      "description": "核对插件注册、表单脚本与站点地图在上游下游是否一致，支持豁免"
+    },
+    "d365_health": {
+      "title": "环境健康",
+      "description": "挂起与失败的后台作业、正在运行的导入发布、最近安装的解决方案"
+    },
+    "d365_reports": {
+      "title": "本机数据",
+      "description": "查看本机产物占用，按保留策略清理或压缩快照"
+    }
+  }
+}

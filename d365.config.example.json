@@ -1,0 +1,61 @@
+{
+  "defaultEnvironment": "dev",
+
+  "timeoutMs": 60000,
+  "maxRecords": 200,
+  "busyWindowMinutes": 120,
+  "handlerPrefixes": [],
+
+  "snapshotKeep": 2,
+  "snapshotMaxAgeDays": 30,
+  "reportKeep": 50,
+  "reportMaxAgeDays": 90,
+  "diffKeep": 20,
+  "diffMaxAgeDays": 30,
+  "queryKeep": 100,
+  "queryMaxAgeDays": 7,
+  "changeKeep": 200,
+  "changeMaxAgeDays": 180,
+  "warnMegabytes": 800,
+
+  "environments": {
+    "dev": {
+      "url": "https://<org>-dev.crm5.dynamics.com",
+      "label": "开发",
+      "cloud": "public",
+      "tenantIdEnv": "D365_TENANT_ID",
+      "clientIdEnv": "D365_DEV_CLIENT_ID",
+      "clientSecretEnv": "D365_DEV_CLIENT_SECRET"
+    },
+    "sit": {
+      "url": "https://<org>-sit.crm5.dynamics.com",
+      "label": "测试",
+      "cloud": "public",
+      "tenantIdEnv": "D365_TENANT_ID",
+      "clientIdEnv": "D365_SIT_CLIENT_ID",
+      "clientSecretEnv": "D365_SIT_CLIENT_SECRET"
+    },
+    "uat": {
+      "url": "https://<org>-uat.crm5.dynamics.com",
+      "label": "验收",
+      "cloud": "public",
+      "tenantIdEnv": "D365_TENANT_ID",
+      "clientIdEnv": "D365_UAT_CLIENT_ID",
+      "clientSecretEnv": "D365_UAT_CLIENT_SECRET"
+    }
+  },
+
+  "write": {
+    "environments": {
+      "dev": ["data.read", "optionValue.add", "attribute.add", "attribute.update"],
+      "sit": ["data.read"],
+      "uat": []
+    },
+    "solutionUniqueName": "ContosoCustomizations"
+  },
+
+  "gitlab": {
+    "url": "https://gitlab.example.com",
+    "defaultProject": "contoso/powerapps"
+  }
+}

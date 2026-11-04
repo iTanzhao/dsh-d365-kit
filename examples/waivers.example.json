@@ -1,0 +1,20 @@
+{
+  "waivers": [
+    {
+      "rule": "form-library-missing",
+      "env": "sit",
+      "object": "/_static/_common/scripts/CommandbarActions.js",
+      "reason": "该环境不使用 SLA 对话框，缺这个库是预期的",
+      "createdAt": "2026-11-04T00:00:00.000Z",
+      "expiresAt": "2026-12-04T00:00:00.000Z"
+    },
+    {
+      "rule": "plugin-step-missing",
+      "env": "*",
+      "object": "Contoso.Legacy.*",
+      "reason": "旧版程序集只保留在 DEV，其余环境已由新方案替代",
+      "createdAt": "2026-11-04T00:00:00.000Z",
+      "expiresAt": "2027-02-01T00:00:00.000Z"
+    }
+  ]
+}

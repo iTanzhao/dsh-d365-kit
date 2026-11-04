@@ -1,0 +1,44 @@
+# dsh-d365-kit (host plugin).
+#
+# Configuration
+# ------------
+# `configFile` is read on every tool call, so environment definitions can be
+# edited without reinstalling the bundle. When it is unset (this shipped shape),
+# the plugin falls back to, in order:
+#   1. the D365_CONFIG_FILE environment variable
+#   2. <USERPROFILE>\Documents\deepseek-harness\default-workspace\d365.config.json
+#      (when that directory exists)
+#   3. <cwd>\d365.config.json
+#
+# Credentials are never written here: name the environment variables instead.
+# Resolution order per value is
+#   1. the inline value (tenantId / clientId / clientSecret)
+#   2. the value saved in d365.secrets.json by the settings page
+#   3. the variable named by <kind>Env
+#   4. D365_<ENV>_<KIND>          e.g. D365_DEV_CLIENT_SECRET
+#   5. D365_<KIND>                e.g. D365_CLIENT_SECRET
+- insert:
+    - id: dsh-d365-kit
+      name: 'dsh-d365-kit'
+      config:
+        # configFile: 'D:\path\to\d365.config.json'
+        defaultEnvironment: dev
+        timeoutMs: 60000
+        maxRecords: 200
+        # Snapshots are large (~125 MB per full pull), so keep only the last two
+        # per environment: enough for `@prev` comparisons, bounded on disk.
+        snapshotKeep: 2
+        environments: {}
+        # environments:
+        #   dev:
+        #     url: 'https://contoso-dev.crm5.dynamics.com'
+        #     label: Dev
+        #     cloud: public          # public | usgovernment | dod | china
+        #     tenantIdEnv: D365_TENANT_ID
+        #     clientIdEnv: D365_DEV_CLIENT_ID
+        #     clientSecretEnv: D365_DEV_CLIENT_SECRET
+        #   uat:
+        #     url: 'https://contoso-uat.crm5.dynamics.com'
+        #     label: UAT
+        #     clientIdEnv: D365_UAT_CLIENT_ID
+        #     clientSecretEnv: D365_UAT_CLIENT_SECRET
