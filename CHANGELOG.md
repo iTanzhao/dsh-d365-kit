@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.24.0
+
+`d365_data_sync`'s dry run now follows how migration is actually requested: the first real run (SIT → DEV) exposed that a plan could be produced without ever asking about scope.
+
+- The plan states three things and asks for confirmation: **scope** (whole table by default; narrow it with `since` / `filter` / `ids` / `fetchXml` when the volume is large), **fields** (all by default; a list containing the primary key means GUIDs are kept), and **whether to bypass custom plugins** (on by default);
+- An omitted scope is no longer an error: it plans the whole table and notes, under "things to note", how many rows were read, whether `maxRecords` was hit, and that the rest is not in this plan;
+- The plan gained a "permissions (execute needs)" block — read on source, read on target, write on target — so a missing `data.write` is called out up front instead of surfacing as a refusal at `execute` time;
+- Bypass defaults to on (the target's synchronous plugins do not fire, so downstream notifications/integrations are not triggered); `execute` can still pass `bypassPlugins=false` explicitly.
+
 ## 0.23.0
 
 New tool: `d365_data_sync`, business-record migration between environments.

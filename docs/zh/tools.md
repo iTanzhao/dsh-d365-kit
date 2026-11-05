@@ -258,7 +258,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 ## d365_data_sync
 
-把一个环境的业务记录搬到另一个环境。默认**镜像**（源 GUID 即目标 GUID）：先 `plan` 只读预演，报告数据量、字段、lookup 情况、冲突、是否 Bypass 插件，人确认后 `execute` 才写入。
+把一个环境的业务记录搬到另一个环境。默认**镜像**（源 GUID 即目标 GUID）：先 `plan` 只读预演，报告数据量、字段、lookup 情况、冲突、**权限是否开启**、是否 Bypass 插件，并列出「迁移条件、迁移字段、Bypass」三项等你确认；人确认后 `execute` 才写入。
 
 | `action` | 作用 |
 | --- | --- |
@@ -266,7 +266,11 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 | `show` / `list` / `cancel` | 重看 / 列出 / 取消待执行计划 |
 | `execute` | 弹确认卡片，批准后才写入 |
 
-范围必须明确，四种任选：`since`（时间窗口；`mode=new` 按 createdon、`mode=modified` 按 modifiedon）、`filter`（OData `$filter`）、`ids`、`fetchXml`；`mode=all` 表示整表，但要配合 `maxRecords`。范围不明确时直接报错要求补充，不去猜「今天新增的」是哪几条。
+迁移前先定三件事（预演结果里会逐条列出，要改就重新 `plan`）：
+
+1. **迁移条件**：`since`（时间窗口；`mode=new` 按 createdon、`mode=modified` 按 modifiedon）、`filter`（OData `$filter`）、`ids`、`fetchXml` 任选；都不给就是**整表**（默认全部）。整表且数据量大时，预演会在「需要注意」里建议用 `since` / `filter` 缩小范围，并用 `maxRecords` 限制本次读多少条。
+2. **迁移字段**：`fields` 不给就是**全部可写字段**。字段清单里**含主键**（`xxxid`）就等于保持 GUID 一致；**不含主键**时目标重新分配 GUID。（也可以用 `keepGuid` 显式覆盖。）
+3. **Bypass 自定义插件**：默认**跳过**（`bypassPlugins: true`，写请求带 `MSCRM.BypassCustomPluginExecution`，目标环境的同步插件不跑，避免触发下游通知/集成）。要照常跑插件就传 `bypassPlugins: false`。
 
 ```json
 { "action": "plan", "source": "dev", "target": "sit",
@@ -275,12 +279,12 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 约束与行为：
 
-- **保持 GUID**：默认是。`keepGuid: false` 时由目标分配主键，批内引用按依赖顺序重映射，创建后二次 `PATCH` 补齐（环上的引用也走这一步）。
+- **保持 GUID**：跟着字段走（见上）；`keepGuid: false` 时由目标分配主键，批内引用按依赖顺序重映射，创建后二次 `PATCH` 补齐（环上的引用也走这一步）。
 - **lookup 解析顺序**：先按 GUID 在目标找同一条；找不到再按主名精确匹配（命中 1 条记「按名称」，多条记「歧义」，0 条记「缺失」）。多态 lookup（`customerid` 这类）先在源环境确定它指向哪张表，不靠猜。
 - **冲突**：目标已存在同 GUID 时默认只报告不写；`conflict: "overwrite"` 才逐条 `PATCH`。
 - **缺失引用**：默认这些记录不写并在报告里列出；`onMissingLookup: "null"` 清空该引用，`"fail"` 让整个计划拒绝执行。
-- **写入选项**：`overriddencreatedon` 保留创建时间；默认带 `MSCRM.SuppressDuplicateDetection`；`bypassPlugins: true` 才带 `MSCRM.BypassCustomPluginExecution`（确认卡片上会写明）。
-- **权限**：`plan` 要求源和目标都有 `data.read`；`execute` 还要求目标有 `data.write`。
+- **写入选项**：`overriddencreatedon` 保留创建时间；默认带 `MSCRM.SuppressDuplicateDetection`；Bypass 默认开（确认卡片上会写明）。
+- **权限**：`plan` 要求源和目标都有 `data.read`；`execute` 还要求目标有 `data.write`。预演的「权限（execute 需要）」段会直接告诉你目标环境还缺哪一项——缺 `data.write` 时 `execute` 会被拦下，先去设置页「权限」勾上。
 - **落地**：计划在 `.d365/data-sync/plans`，执行记录在 `.d365/data-sync/runs`（含每条源 GUID → 目标 GUID 与失败原因）。
 - 只新增/修改，**不删记录**；不搬审计字段（createdby/modifiedby 等），owner 按 `ownerMode`（`map` / `keep` / `caller`）处理。
 

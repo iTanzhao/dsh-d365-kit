@@ -258,7 +258,7 @@ Constraints:
 
 ## d365_data_sync
 
-Moves business records from one environment to another. The default is **mirror** (source GUID becomes target GUID): `plan` is a read-only dry run that reports volume, fields, lookup outcomes, conflicts and whether plugins are bypassed; `execute` writes only after a human approves the card.
+Moves business records from one environment to another. The default is **mirror** (source GUID becomes target GUID): `plan` is a read-only dry run that reports volume, fields, lookup outcomes, conflicts, **whether the permissions to execute are granted**, and whether plugins are bypassed — then it lists three things for you to confirm: scope, fields, and bypass. `execute` writes only after a human approves the card.
 
 | `action` | What it does |
 | --- | --- |
@@ -266,7 +266,11 @@ Moves business records from one environment to another. The default is **mirror*
 | `show` / `list` / `cancel` | Re-read / list / drop a pending plan |
 | `execute` | Shows a confirmation card, then writes |
 
-The scope must be explicit: `since` (a time window; `mode=new` uses createdon, `mode=modified` uses modifiedon), `filter` (OData `$filter`), `ids`, or `fetchXml`; `mode=all` means the whole table and must be paired with `maxRecords`. An unclear scope is an error, never a guess.
+Three decisions are made before anything moves (the dry run lists all three; change one and re-run `plan`):
+
+1. **Scope**: `since` (a time window; `mode=new` uses createdon, `mode=modified` uses modifiedon), `filter` (OData `$filter`), `ids`, or `fetchXml`. With none of them the whole table is the default; when that is large the plan says so and recommends narrowing it, and `maxRecords` caps how many rows this plan reads.
+2. **Fields**: `fields` omitted means every writable column. A field list that **includes the primary key** (`xxxid`) keeps GUIDs identical; a list **without** it lets the target assign new ids. `keepGuid` can still override either way.
+3. **Bypass custom plugins**: on by default (`bypassPlugins: true` sends `MSCRM.BypassCustomPluginExecution`, so the target's synchronous plugins do not fire and cannot kick off downstream notifications/integrations). Pass `bypassPlugins: false` to let them run.
 
 ```json
 { "action": "plan", "source": "dev", "target": "sit",
@@ -275,12 +279,12 @@ The scope must be explicit: `since` (a time window; `mode=new` uses createdon, `
 
 Behavior and constraints:
 
-- **GUIDs**: kept by default. With `keepGuid: false` the target assigns ids, references inside the batch are remapped in dependency order, and a second `PATCH` pass fills in lookups that pointed at a record created later in the run.
+- **GUIDs**: follow the field list (above). With `keepGuid: false` the target assigns ids, references inside the batch are remapped in dependency order, and a second `PATCH` pass fills in lookups that pointed at a record created later in the run.
 - **Lookup resolution order**: same GUID in the target first; otherwise an exact primary-name match (one hit = matched by name, several = ambiguous, none = missing). Polymorphic lookups (such as `customerid`) are resolved to a real table by reading the source first, not by guessing.
 - **Conflicts**: a record whose GUID already exists in the target is reported, not written; `conflict: "overwrite"` turns those into per-row `PATCH`es.
 - **Missing references**: by default those rows are skipped and listed; `onMissingLookup: "null"` clears the reference, `"fail"` refuses the whole plan.
-- **Write options**: `overriddencreatedon` preserves creation time; `MSCRM.SuppressDuplicateDetection` is sent by default; `MSCRM.BypassCustomPluginExecution` only when `bypassPlugins: true`, and the card states it.
-- **Permissions**: `plan` needs `data.read` on both ends; `execute` also needs `data.write` on the target.
+- **Write options**: `overriddencreatedon` preserves creation time; `MSCRM.SuppressDuplicateDetection` is sent by default; bypass is on by default and the card states it.
+- **Permissions**: `plan` needs `data.read` on both ends; `execute` also needs `data.write` on the target. The plan's "permissions" block names the missing switch — without `data.write` on the target, `execute` is refused, so tick it on the settings page first.
 - **Files**: plans under `.d365/data-sync/plans`, run logs under `.d365/data-sync/runs` (source GUID → target GUID and failure reasons per row).
 - Creates and updates only, **never deletes**; audit columns (createdby/modifiedby and friends) are not copied; owner follows `ownerMode` (`map` / `keep` / `caller`).
 
