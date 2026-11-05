@@ -4,6 +4,17 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.26.0
+
+解决方案层现在可写了，但只开一种：移除未受管的自定义层。
+
+- `d365_write` 新增 action `plan-remove-layer` 与能力 `layer.remove`（「移除自定义层」，高危、默认关闭）：只有最上面那层显示为 `Active`（未命名的未受管层）时才删，删完由解决方案最后带来的那层重新生效；
+- 计划里写出整条层栈、被删的层、以及接手的是哪一层（没有下层就是「系统定义」）；执行仍走同一张确认卡片和同一次发布，发布范围收窄到受影响的表；
+- 背后只有 `RemoveActiveCustomizations` 一个消息。最上层属于某个解决方案时直接拒绝（`not-active-layer`）：那种定义归那个解决方案管，要么在解决方案里移除组件，要么发一个新 patch 覆盖它；
+- `DeleteAndPromote` 与 `RemoveSolutionComponent` 明确不做；
+- 层的解析函数（`COMPONENT_TYPES`、`resolveComponentId`、`buildComponentFilter`）从 `lib/tool-layers.js` 导出，读和写共用同一套解析；
+- `RemoveActiveCustomizations` 加入元数据写白名单，所以这个操作要的是 `layer.remove`，而不是 `data.write`。
+
 ## 0.25.0
 
 元数据读取变成一项独立权限，权限页也从一个宽表改成按环境分块。

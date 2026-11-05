@@ -47,6 +47,7 @@ Configured in `d365.config.json`:
 | `attribute.delete` | `DELETE` field URL | Field | **Permanently delete** the field and its data (high risk) |
 | `entity.update` | `PUT` entity URL (`MSCRM.MergeLabels`) | Table | Change table display name and description |
 | `view.columns` | `PATCH savedqueries(id)` | View | Add or remove columns in system views (`layoutxml` only) |
+| `layer.remove` | `RemoveActiveCustomizations` | Layer | **Permanently remove** the top-most unmanaged layer of a component (high risk; tables and fields only) |
 
 Tick them per environment under Permissions in the settings page; "Copy to all environments" is supported.
 
@@ -56,7 +57,7 @@ The decision lives in one place, `lib/client.js`, so a new tool cannot bypass it
 
 - **Metadata read**: the entity set name in the request URL is on the metadata allowlist (`EntityDefinitions`, `systemforms`, `savedqueries`, `webresourceset`, `solutions`, `msdyn_componentlayers`…) and requires `metadata.read`; it fails with `metadata-read-forbidden`;
 - **Business-data read**: every other `GET` is blocked as business data and requires `data.read`; it fails with `data-read-forbidden`;
-- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`.
+- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`.
 
 Every gate fires **before a token is acquired**, so the request never reaches the environment. Decisions are cached per environment for 2 seconds, so a change in the settings page applies to the next tool call.
 

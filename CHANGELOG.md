@@ -4,6 +4,17 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.26.0
+
+Solution layers are now writable, in exactly one way: remove the unmanaged layer.
+
+- New `d365_write` action `plan-remove-layer` and capability `layer.remove` ("Remove custom layer", high risk, off by default): it deletes the top-most layer of a table or a column **only when that layer reads `Active`** — the unnamed unmanaged layer — so whatever a solution last shipped becomes active again;
+- The plan renders the whole layer stack, the layer being removed and the layer that takes over (or "system definition" when nothing is below); execution goes through the same confirmation card and the same publish step, narrowed to the affected table;
+- `RemoveActiveCustomizations` is the only message behind it. A top layer owned by a solution is refused up front (`not-active-layer`): those definitions belong to that solution — remove the component there, or ship a patch that overrides it;
+- `DeleteAndPromote` and `RemoveSolutionComponent` are deliberately not implemented;
+- The layer helpers (`COMPONENT_TYPES`, `resolveComponentId`, `buildComponentFilter`) moved from `lib/tool-layers.js` to exports so read and write share one resolver;
+- `RemoveActiveCustomizations` joined the metadata-write allowlist, so the operation needs `layer.remove` rather than `data.write`.
+
 ## 0.25.0
 
 Metadata reads are now a permission of their own, and the Permissions page shows one block per environment instead of one wide table.

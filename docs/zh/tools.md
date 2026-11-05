@@ -305,6 +305,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 | `plan-delete-attribute` | `entity`、`attribute`、`acknowledge: true` | 删除字段（高危） |
 | `plan-update-entity` | `entity`、`displayName` | 改表显示名与描述 |
 | `plan-view-columns` | `view`、`addColumns` / `removeColumns` | 增删系统视图的列 |
+| `plan-remove-layer` | `component`、`componentType`（Entity/Attribute）、`acknowledge: true` | 移除组件最上面的未受管自定义层（高危） |
 | `list` | — | 列待确认计划 |
 | `execute` | `planId` | 弹确认卡片，批准后执行 |
 | `cancel` | `planId` | 取消待确认计划 |
@@ -346,6 +347,16 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 ```json
 { "action": "execute", "planId": "mw04aul6-1ci6aa" }
 ```
+
+`plan-remove-layer` 只删**最上面那一层、且必须显示为 `Active`**（未受管的自定义层），删完由下面那层重新生效：
+
+| 参数 | 说明 |
+| --- | --- |
+| `componentType` | `Entity`（表）或 `Attribute`（字段），默认 `Entity` |
+| `component` | 表逻辑名；`Attribute` 时是字段逻辑名 |
+| `entity` | `componentType: Attribute` 时必填：字段所属的表 |
+
+计划会写出层栈、被删的层、以及之后生效的是哪一层（没有下层就是「系统定义」）。最上层若不是 `Active` 会直接拒绝：那种层属于某个解决方案，要在解决方案里移除组件，或导入一个新 patch 覆盖它。删层不可恢复，执行后按受影响的表发布。
 
 写入细节、确认卡片、发布范围见 [permissions.md](permissions.md)。
 

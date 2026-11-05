@@ -107,10 +107,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.26.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.26.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -218,6 +218,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 | `attribute.delete` | `DeleteAttribute` | 永久删除字段及其数据（高危） |
 | `entity.update` | `UpdateEntity` | 改表显示名与描述 |
 | `view.columns` | `UpdateSavedQuery` | 增删系统视图的列 |
+| `layer.remove` | `RemoveActiveCustomizations` | 移除组件最上面的未受管自定义层（高危） |
 
 写入是两步：`plan-*` 只读生成计划 → 人在对话（或设置页）确认后 `execute`。执行前会查环境是否正在导入/发布，忙则拒绝；每次执行逐条记进 `.d365/changes/`，计划有 `pending → running → done/failed` 状态，重跑不会重复提交。
 

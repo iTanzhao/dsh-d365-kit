@@ -107,10 +107,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.26.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.26.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -218,6 +218,7 @@ An environment with no entry has never been configured and gets only `metadata.r
 | `attribute.delete` | `DeleteAttribute` | Permanently delete a field and its data (high risk) |
 | `entity.update` | `UpdateEntity` | Change a table's display name and description |
 | `view.columns` | `UpdateSavedQuery` | Add or remove system view columns |
+| `layer.remove` | `RemoveActiveCustomizations` | Remove a component's top-most unmanaged layer (high risk) |
 
 Writes take two steps: `plan-*` generates a plan read-only → a human confirms in the conversation (or the settings page) → `execute`. Before execution it checks whether the environment is importing/publishing and refuses if it is busy; every execution is recorded item by item in `.d365/changes/`, plans move through `pending → running → done/failed`, and a re-run does not submit twice.
 

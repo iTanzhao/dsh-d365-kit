@@ -305,6 +305,7 @@ Metadata changes. **`plan-*` actions are read-only** and only produce a plan; `e
 | `plan-delete-attribute` | `entity`, `attribute`, `acknowledge: true` | Delete a field (high risk) |
 | `plan-update-entity` | `entity`, `displayName` | Change the table display name and description |
 | `plan-view-columns` | `view`, `addColumns` / `removeColumns` | Add or remove system view columns |
+| `plan-remove-layer` | `component`, `componentType` (Entity/Attribute), `acknowledge: true` | Remove the top-most unmanaged layer of a component (high risk) |
 | `list` | — | List pending plans |
 | `execute` | `planId` | Show a confirmation card and run after approval |
 | `cancel` | `planId` | Cancel a pending plan |
@@ -346,6 +347,16 @@ Common parameters:
 ```json
 { "action": "execute", "planId": "mw04aul6-1ci6aa" }
 ```
+
+`plan-remove-layer` removes **only the top layer, and only when it reads `Active`** (the unmanaged customizations layer); whatever solution layer sits below becomes active again:
+
+| Parameter | Meaning |
+| --- | --- |
+| `componentType` | `Entity` (table) or `Attribute` (column), defaults to `Entity` |
+| `component` | Table logical name; for an attribute, the column logical name |
+| `entity` | Required when `componentType: Attribute`: the table owning that column |
+
+The plan lists the layer stack, the layer being removed, and what becomes active next (or "system definition" when nothing is below). If the top layer is not `Active` the plan is refused: that layer belongs to a solution — remove the component from that solution, or ship a patch that overrides it. Removing a layer cannot be undone; the affected table is published afterwards.
 
 Write details, confirmation cards and publish scope are covered in [permissions.md](permissions.md).
 

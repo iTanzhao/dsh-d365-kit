@@ -47,6 +47,7 @@
 | `attribute.delete` | `DELETE` 字段 URL | 字段 | **永久删除**字段及其数据（高危） |
 | `entity.update` | `PUT` 实体 URL（`MSCRM.MergeLabels`） | 表 | 改表显示名与描述 |
 | `view.columns` | `PATCH savedqueries(id)` | 视图 | 在系统视图里增删列（只改 `layoutxml`） |
+| `layer.remove` | `RemoveActiveCustomizations` | 组件层 | **永久移除**组件最上面的未受管自定义层（高危；只支持表与字段） |
 
 设置页「权限」里按环境勾选，支持「复制到其他环境」。
 
@@ -56,7 +57,7 @@
 
 - **元数据读**：URL 的实体集名在元数据白名单（`EntityDefinitions`、`systemforms`、`savedqueries`、`webresourceset`、`solutions`、`msdyn_componentlayers`…）里，要求 `metadata.read`，报 `metadata-read-forbidden`；
 - **业务数据读**：其余 `GET` 一律按业务数据拦截，要求 `data.read`，报 `data-read-forbidden`；
-- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`。
+- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`。
 
 拦截都发生在**取令牌之前**，不会把请求发到环境里。判定结果按环境缓存 2 秒，设置页改了权限后下一次工具调用就生效。
 
