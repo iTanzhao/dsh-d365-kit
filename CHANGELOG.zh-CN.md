@@ -4,6 +4,17 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.23.0
+
+新增 `d365_data_sync`：业务记录跨环境迁移。
+
+- 两段式：`plan` 只读预演（落 `.d365/data-sync/plans`），`execute` 在确认卡片上批准后才写（记录落 `.d365/data-sync/runs`）。计划里写明数据量、字段清单、每个 lookup 的解析结果、owner 映射、冲突与「是否 Bypass 自定义插件」；
+- 默认镜像：保持源 GUID（带 `overriddencreatedon` 保留创建时间、`MSCRM.SuppressDuplicateDetection`）；`keepGuid=false` 时由目标分配主键，批内引用按依赖顺序重映射并在创建后二次 `PATCH` 补齐（环也能走通）；
+- lookup 先按 GUID 在目标找同一条，再按主名精确匹配；命不中记「缺失」，多处同名记「歧义」。多态 lookup 先在源环境确定它指向哪张表——`Targets` 在基础 `AttributeMetadata` 上不可选（0x80060888），改从 `LookupAttributeMetadata` 读；
+- 范围必须明确（`since` / `filter` / `ids` / `fetchXml`，或 `mode=all` 配 `maxRecords`），范围不明直接报错要求补充，不猜「今天新增的」；
+- 目标已存在同 GUID 默认只报告不写，`conflict="overwrite"` 才逐条 `PATCH`；缺失引用默认跳过这些记录，`null` 清空、`fail` 整体拒绝；
+- 权限沿用两道闸：`plan` 要源和目标 `data.read`，`execute` 还要目标 `data.write`；只新增/修改，不删记录。
+
 ## 0.22.2
 
 真实 UAT 环境上发现的问题修复。

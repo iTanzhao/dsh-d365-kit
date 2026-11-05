@@ -14,6 +14,10 @@
  *   d365_refs       who references a field, script or plugin assembly
  *   d365_data       count / group / sample business records (needs `data.read`)
  *   d365_data_write create or patch one business record (needs `data.write`)
+ *   d365_data_sync  move business records between environments (plan, then confirm)
+ *   d365_contract   compare plugin registration / option values across environments
+ *   d365_health     stuck jobs, running imports, recently installed solutions
+ *   d365_reports    what this plugin wrote to disk, and how much space it takes
  *
  * Reads go through `lib/client.js`, which sends GET only and splits reads in
  * two: metadata (always allowed) and business records (needs `data.read` for
@@ -41,6 +45,7 @@ import { register as registerDataWrite } from './lib/tool-data-write.js'
 import { register as registerContract } from './lib/tool-contract.js'
 import { register as registerHealth } from './lib/tool-health.js'
 import { register as registerReports } from './lib/tool-reports.js'
+import { register as registerDataSync } from './lib/tool-data-sync.js'
 import { registerRoutes } from './lib/settings-http.js'
 import { setDataReadResolver, setDataWriteResolver } from './lib/client.js'
 import { makeDataReadResolver, makeDataWriteResolver } from './lib/data-policy.js'
@@ -79,9 +84,10 @@ export function apply(ctx, config = {}) {
     registerRefs(ctx, state),
     registerData(ctx, state),
     registerDataWrite(ctx, state),
-registerContract(ctx, state),
-registerHealth(ctx, state),
-registerReports(ctx, state),
+    registerDataSync(ctx, state),
+    registerContract(ctx, state),
+    registerHealth(ctx, state),
+    registerReports(ctx, state),
   ]
 
   ctx.effect(() => () => {

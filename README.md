@@ -107,10 +107,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.22.2"
+plugin_manager install_bundle target="dsh-d365-kit@0.23.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.22.2"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.23.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -248,7 +248,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 | Document | Contents |
 | --- | --- |
 | [docs/en/installation.md](docs/en/installation.md) | Installation, first-time setup, credentials, upgrade, uninstall |
-| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 15 tools |
+| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 16 tools |
 | [docs/en/scenarios.md](docs/en/scenarios.md) | Complete walkthroughs for 8 real scenarios |
 | [docs/en/permissions.md](docs/en/permissions.md) | Capability table, write flow, pre-flight check, safety boundary |
 | [docs/en/checks.md](docs/en/checks.md) | Rules and confidence levels for migration assessment, contract drift and code checks |
@@ -274,7 +274,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 ## Development
 
 ```
-index.js              # Host entry: registers the 15 tools, mounts the settings page routes
+index.js              # Host entry: registers the 16 tools, mounts the settings page routes
 client.js             # settings page (six tabs, no build step)
 lib/
   client.js           # Dataverse Web API client (retry, paging, permission gate)

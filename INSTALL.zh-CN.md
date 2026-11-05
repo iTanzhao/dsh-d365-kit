@@ -2,7 +2,7 @@
 
 **[English](INSTALL.md)** | 简体中文
 
-`dsh-d365-kit` 是 DeepSeek Harness 的 bundle（Host 插件 + 设置页）。装完会有 15 个 `d365_*` 工具和「设置 → D365 工具箱」页面。
+`dsh-d365-kit` 是 DeepSeek Harness 的 bundle（Host 插件 + 设置页）。装完会有 16 个 `d365_*` 工具和「设置 → D365 工具箱」页面。
 
 更完整的步骤见 [docs/installation.md](docs/zh/installation.md)。
 
@@ -18,7 +18,7 @@
 ### 方式一：从 npm 装（最短，可升级）
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.22.2"
+plugin_manager install_bundle target="dsh-d365-kit@0.23.0"
 ```
 
 前提是包已经发到 pnpm 用的那个 registry——公网 npm 或公司内网镜像都行。包名没有 scope，不需要配 scope 映射。
@@ -28,7 +28,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.22.2"
 ### 方式二：从 Git 装（不需要 registry）
 
 ```
-plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.22.2"
+plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.23.0"
 ```
 
 ### 方式三：从本地目录装

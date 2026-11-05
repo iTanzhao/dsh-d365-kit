@@ -2,12 +2,12 @@
 
 **[English](../en/tools.md)** | 简体中文
 
-15 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
+16 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
 
 约定：
 
 - **环境参数**：`environment`（单个）、`environments`（数组）、`allEnvironments`（全部）。省略时用配置的默认环境。
-- **只读与写入**：只有 `d365_write execute`、`d365_data_write` 会改环境，且必须人在确认卡片上批准。
+- **只读与写入**：只有 `d365_write execute`、`d365_data_write`、`d365_data_sync execute` 会改环境，且必须人在确认卡片上批准。
 - **产物**：`<工作区>/.d365/`。返回里给的是**绝对路径**，可直接用文件工具打开。
 
 ---
@@ -253,6 +253,36 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 - `create` 带 `Prefer: return=representation`，`update` 带 `If-Match: *`；
 - 审计写 `.d365/query/<时间戳>-data-write-<action>.json`，**只记字段名、不落值**；
 - 不能删记录。
+
+---
+
+## d365_data_sync
+
+把一个环境的业务记录搬到另一个环境。默认**镜像**（源 GUID 即目标 GUID）：先 `plan` 只读预演，报告数据量、字段、lookup 情况、冲突、是否 Bypass 插件，人确认后 `execute` 才写入。
+
+| `action` | 作用 |
+| --- | --- |
+| `plan` | 生成只读计划并落文件，不写任何东西（默认） |
+| `show` / `list` / `cancel` | 重看 / 列出 / 取消待执行计划 |
+| `execute` | 弹确认卡片，批准后才写入 |
+
+范围必须明确，四种任选：`since`（时间窗口；`mode=new` 按 createdon、`mode=modified` 按 modifiedon）、`filter`（OData `$filter`）、`ids`、`fetchXml`；`mode=all` 表示整表，但要配合 `maxRecords`。范围不明确时直接报错要求补充，不去猜「今天新增的」是哪几条。
+
+```json
+{ "action": "plan", "source": "dev", "target": "sit",
+  "entity": "account", "since": "2026-11-05T00:00:00+08:00", "maxRecords": 200 }
+```
+
+约束与行为：
+
+- **保持 GUID**：默认是。`keepGuid: false` 时由目标分配主键，批内引用按依赖顺序重映射，创建后二次 `PATCH` 补齐（环上的引用也走这一步）。
+- **lookup 解析顺序**：先按 GUID 在目标找同一条；找不到再按主名精确匹配（命中 1 条记「按名称」，多条记「歧义」，0 条记「缺失」）。多态 lookup（`customerid` 这类）先在源环境确定它指向哪张表，不靠猜。
+- **冲突**：目标已存在同 GUID 时默认只报告不写；`conflict: "overwrite"` 才逐条 `PATCH`。
+- **缺失引用**：默认这些记录不写并在报告里列出；`onMissingLookup: "null"` 清空该引用，`"fail"` 让整个计划拒绝执行。
+- **写入选项**：`overriddencreatedon` 保留创建时间；默认带 `MSCRM.SuppressDuplicateDetection`；`bypassPlugins: true` 才带 `MSCRM.BypassCustomPluginExecution`（确认卡片上会写明）。
+- **权限**：`plan` 要求源和目标都有 `data.read`；`execute` 还要求目标有 `data.write`。
+- **落地**：计划在 `.d365/data-sync/plans`，执行记录在 `.d365/data-sync/runs`（含每条源 GUID → 目标 GUID 与失败原因）。
+- 只新增/修改，**不删记录**；不搬审计字段（createdby/modifiedby 等），owner 按 `ownerMode`（`map` / `keep` / `caller`）处理。
 
 ---
 

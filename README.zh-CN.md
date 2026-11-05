@@ -107,10 +107,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.22.2"
+plugin_manager install_bundle target="dsh-d365-kit@0.23.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.22.2"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.23.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -248,7 +248,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 | 文档 | 内容 |
 | --- | --- |
 | [docs/installation.md](docs/zh/installation.md) | 安装、首次配置、凭据、升级、卸载 |
-| [docs/tools.md](docs/zh/tools.md) | 15 个工具的参数、返回与示例 |
+| [docs/tools.md](docs/zh/tools.md) | 16 个工具的参数、返回与示例 |
 | [docs/scenarios.md](docs/zh/scenarios.md) | 8 个真实场景的完整走法 |
 | [docs/permissions.md](docs/zh/permissions.md) | 能力表、写入流程、预检查、安全边界 |
 | [docs/checks.md](docs/zh/checks.md) | 迁移评估、契约漂移、代码检查的规则与置信度 |
@@ -274,7 +274,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 ## 开发
 
 ```
-index.js              # Host 入口：注册 15 个工具、挂设置页路由
+index.js              # Host 入口：注册 16 个工具、挂设置页路由
 client.js             # 设置页（六个标签，无构建步骤）
 lib/
   client.js           # Dataverse Web API 客户端（重试、分页、权限闸）

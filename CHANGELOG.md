@@ -4,6 +4,17 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.23.0
+
+New tool: `d365_data_sync`, business-record migration between environments.
+
+- Two-stage: `plan` is a read-only dry run (saved under `.d365/data-sync/plans`), and `execute` writes only after a human approves a confirmation card (runs are logged under `.d365/data-sync/runs`). The plan states volume, the field list, how every lookup resolved, owner mapping, conflicts and whether custom plugins will be bypassed;
+- Mirror by default: source GUIDs are kept (`overriddencreatedon` preserves creation time, `MSCRM.SuppressDuplicateDetection` is sent). With `keepGuid: false` the target assigns ids, references inside the batch are remapped in dependency order, and a second `PATCH` pass fills lookups that pointed at a record created later — cycles included;
+- Lookups resolve by same GUID in the target first, then by exact primary name; no match is "missing", several are "ambiguous". Polymorphic lookups are resolved to a real table by reading the source first, because `Targets` cannot be selected on the base `AttributeMetadata` (0x80060888) — it is read from `LookupAttributeMetadata` instead;
+- The scope must be explicit (`since` / `filter` / `ids` / `fetchXml`, or `mode=all` with `maxRecords`); an unclear scope is an error, never a guess;
+- A GUID that already exists in the target is reported, not written; `conflict="overwrite"` turns those into per-row `PATCH`es. Missing references skip the affected rows by default, `null` clears them, `fail` refuses the plan;
+- Same two permission gates: `plan` needs `data.read` on both ends, `execute` also needs `data.write` on the target. Creates and updates only — never deletes.
+
 ## 0.22.2
 
 Correctness fixes found against a real UAT organization.

@@ -2,12 +2,12 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-15 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+16 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
 
 Conventions:
 
 - **Environment parameters**: `environment` (single), `environments` (array), `allEnvironments` (all). When omitted, the configured default environment is used.
-- **Read vs. write**: only `d365_write execute` and `d365_data_write` change an environment, and each must be approved by a human on a confirmation card.
+- **Read vs. write**: only `d365_write execute`, `d365_data_write` and `d365_data_sync execute` change an environment, and each must be approved by a human on a confirmation card.
 - **Artifacts**: `<workspace>/.d365/`. Paths are returned as **absolute paths** and can be opened directly with the file tools.
 
 ---
@@ -253,6 +253,36 @@ Constraints:
 - `create` sends `Prefer: return=representation`, `update` sends `If-Match: *`;
 - Audit is written to `.d365/query/<timestamp>-data-write-<action>.json`, recording **field names only, never values**;
 - Records cannot be deleted.
+
+---
+
+## d365_data_sync
+
+Moves business records from one environment to another. The default is **mirror** (source GUID becomes target GUID): `plan` is a read-only dry run that reports volume, fields, lookup outcomes, conflicts and whether plugins are bypassed; `execute` writes only after a human approves the card.
+
+| `action` | What it does |
+| --- | --- |
+| `plan` | Builds a read-only plan and writes it to a file; nothing touches either org (default) |
+| `show` / `list` / `cancel` | Re-read / list / drop a pending plan |
+| `execute` | Shows a confirmation card, then writes |
+
+The scope must be explicit: `since` (a time window; `mode=new` uses createdon, `mode=modified` uses modifiedon), `filter` (OData `$filter`), `ids`, or `fetchXml`; `mode=all` means the whole table and must be paired with `maxRecords`. An unclear scope is an error, never a guess.
+
+```json
+{ "action": "plan", "source": "dev", "target": "sit",
+  "entity": "account", "since": "2026-11-05T00:00:00+08:00", "maxRecords": 200 }
+```
+
+Behavior and constraints:
+
+- **GUIDs**: kept by default. With `keepGuid: false` the target assigns ids, references inside the batch are remapped in dependency order, and a second `PATCH` pass fills in lookups that pointed at a record created later in the run.
+- **Lookup resolution order**: same GUID in the target first; otherwise an exact primary-name match (one hit = matched by name, several = ambiguous, none = missing). Polymorphic lookups (such as `customerid`) are resolved to a real table by reading the source first, not by guessing.
+- **Conflicts**: a record whose GUID already exists in the target is reported, not written; `conflict: "overwrite"` turns those into per-row `PATCH`es.
+- **Missing references**: by default those rows are skipped and listed; `onMissingLookup: "null"` clears the reference, `"fail"` refuses the whole plan.
+- **Write options**: `overriddencreatedon` preserves creation time; `MSCRM.SuppressDuplicateDetection` is sent by default; `MSCRM.BypassCustomPluginExecution` only when `bypassPlugins: true`, and the card states it.
+- **Permissions**: `plan` needs `data.read` on both ends; `execute` also needs `data.write` on the target.
+- **Files**: plans under `.d365/data-sync/plans`, run logs under `.d365/data-sync/runs` (source GUID → target GUID and failure reasons per row).
+- Creates and updates only, **never deletes**; audit columns (createdby/modifiedby and friends) are not copied; owner follows `ownerMode` (`map` / `keep` / `caller`).
 
 ---
 
