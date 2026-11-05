@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.24.1
+
+第一次真写 550 条全部失败：每个请求都返回 `0x80048d19 … A 'PrimitiveValue' node with non-null value was found when trying to read the value of the property 'contoso_bg'`。一条也没写进去，修好后用同一个计划重跑。
+
+- lookup 改为按 `@odata.bind` 导航属性发送 —— `"contoso_bg@odata.bind": "/contoso_geographicunits(<guid>)"` —— 而不是把裸 GUID 写进属性列；Dataverse 对任何 lookup 都拒绝后者；
+- `ownerid` 同样用 `@odata.bind`，按源所有者实际类型指向 `/systemusers(...)` 或 `/teams(...)`，且只在所有者需要重映射时才写；
+- 延后解析的 lookup（父记录创建后才拿到目标 GUID）不再塞进新建请求体，改为创建后用 `PATCH` 补；原代码只处理了普通列；
+- 离线写路径测试改为断言请求体的真实形状，不再只判断「有某个键」——这正是裸 GUID 之前能混过去的原因。
+
 ## 0.24.0
 
 `d365_data_sync` 按真实测试的用法改预演流程：第一次真迁移（SIT → DEV）暴露了「不问条件就出全量计划」的问题。

@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.24.1
+
+The first real write of 550 rows failed in full: every request came back `0x80048d19 … A 'PrimitiveValue' node with non-null value was found when trying to read the value of the property 'contoso_bg'`. Nothing was written, so the same plan was re-run after the fix.
+
+- Lookups are now sent as `@odata.bind` navigation properties — `"contoso_bg@odata.bind": "/contoso_geographicunits(<guid>)"` — instead of a bare GUID in the attribute column, which Dataverse rejects for every lookup;
+- `ownerid` is bound the same way, to `/systemusers(...)` or `/teams(...)` depending on what the source owner actually is, and only when the owner is remapped;
+- Deferred lookups (their target GUID only known after the parent is created) are dropped from the create body and re-applied by `PATCH`; the previous code only handled plain columns there;
+- The offline write-path test now asserts the real shape of the request body instead of `a key exists`, which is why the bare-GUID form passed the earlier test.
+
 ## 0.24.0
 
 `d365_data_sync`'s dry run now follows how migration is actually requested: the first real run (SIT → DEV) exposed that a plan could be produced without ever asking about scope.
