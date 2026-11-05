@@ -4,6 +4,16 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.25.0
+
+Metadata reads are now a permission of their own, and the Permissions page shows one block per environment instead of one wide table.
+
+- New capability `metadata.read` ("Read metadata"), on by default and listed first in the settings page: turning it off makes tables, fields, forms, views and layers unreadable too, so every request now consults the policy — nothing reaches an environment without passing a gate;
+- `lib/client.js` decides in one place: metadata entity sets need `metadata.read` (`metadata-read-forbidden`), every other `GET` needs `data.read` (`data-read-forbidden`), non-`GET` writes need `data.write` (`data-write-forbidden`) — all before a token is acquired;
+- The Permissions page renders each environment as its own block separated by a rule, with a `granted/total` summary per environment; the "metadata is always readable" note now appears once above the blocks;
+- `write.environments` entries are now three-state: absent = not configured (metadata read on), empty array = everything revoked, a list = exactly those capabilities. Empty arrays were previously dropped on read, which silently re-enabled the default;
+- `write.capabilityVersion` (2) tells the loader that an older file's entries predate `metadata.read`; those entries get it added back so behaviour after upgrading is unchanged.
+
 ## 0.24.1
 
 The first real write of 550 rows failed in full: every request came back `0x80048d19 … A 'PrimitiveValue' node with non-null value was found when trying to read the value of the property 'contoso_bg'`. Nothing was written, so the same plan was re-run after the fix.

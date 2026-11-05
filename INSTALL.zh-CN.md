@@ -18,7 +18,7 @@
 ### 方式一：从 npm 装（最短，可升级）
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
 ```
 
 前提是包已经发到 pnpm 用的那个 registry——公网 npm 或公司内网镜像都行。包名没有 scope，不需要配 scope 映射。
@@ -28,7 +28,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
 ### 方式二：从 Git 装（不需要 registry）
 
 ```
-plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.25.0"
 ```
 
 ### 方式三：从本地目录装
@@ -47,8 +47,9 @@ plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
 
 1. 设置 → D365 工具箱 → 环境 → 添加环境：key（如 `dev`）、URL、租户 ID、ClientId、客户端密钥；
 2. 点「测试连接」，看到版本号说明凭据没问题；
-3. 到「权限」标签勾选这台机器允许做什么：
-   - 「读取业务数据」——不勾就只能读元数据，读不到表里的记录；
+3. 到「权限」标签勾选这台机器允许做什么（每个环境单独一块，用分隔线隔开）：
+   - 「读取元数据」——默认就是勾上的；不勾连表、字段、视图都查不到；
+   - 「读取业务数据」——不勾就读不到表里的记录；
    - 写入类能力默认全关，勾了之后每次执行仍要人在对话里确认；
 4. 点「保存」。
 

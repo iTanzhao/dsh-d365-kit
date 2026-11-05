@@ -205,7 +205,7 @@ Limitations: a quick view of forms that reference fields of other entities is ou
 
 ## d365_data
 
-Reads business records. **Off by default**: unless "Read business data" (`data.read`) is checked for that environment on the settings page, any non-metadata table is rejected before a token is acquired.
+Reads business records. **Off by default**: unless "Read business data" (`data.read`) is checked for that environment on the settings page, any non-metadata table is rejected before a token is acquired. Metadata itself is governed by "Read metadata" (`metadata.read`), on by default.
 
 | Parameter | Type | Description |
 | --- | --- | --- |

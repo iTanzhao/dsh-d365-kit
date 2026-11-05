@@ -4,13 +4,13 @@
 
 ## Default posture
 
-Right after installation the plugin is **read-only, and only for metadata**:
+Right after installation the plugin is **read-only**:
 
-- Metadata (entities, fields, forms, views, plugins, solutions, layers, sitemaps…) is readable at any time;
+- Metadata (entities, fields, forms, views, plugins, solutions, layers, sitemaps…) is governed by `metadata.read`, which is **on by default** — an environment that is not listed explicitly counts as granted;
 - **Business records** are not readable by default; grant `data.read` per environment;
 - Any change needs the matching capability granted per environment, and every execution needs a human confirmation.
 
-"What you can see" and "what you can change" share one per-environment capability table, because the two belong together.
+"What you can see" and "what you can change" share one per-environment capability table, because the two belong together. The page renders one block per environment, separated by a rule.
 
 ## Capability table
 
@@ -19,9 +19,10 @@ Configured in `d365.config.json`:
 ```json
 {
   "write": {
+    "capabilityVersion": 2,
     "environments": {
-      "dev": ["data.read", "optionValue.add", "attribute.add", "view.columns"],
-      "sit": ["data.read"],
+      "dev": ["metadata.read", "data.read", "optionValue.add", "attribute.add", "view.columns"],
+      "sit": ["metadata.read", "data.read"],
       "uat": []
     },
     "solutionUniqueName": "ContosoBase"
@@ -29,9 +30,14 @@ Configured in `d365.config.json`:
 }
 ```
 
+- An environment with **no entry** has never been configured and keeps the default (only `metadata.read`);
+- An environment whose entry is an **empty array** has everything revoked, including metadata;
+- `capabilityVersion` is written by the settings page when it saves. Older files (without the field) get `metadata.read` added back to their existing entries, which preserves the pre-upgrade "metadata is always readable" behaviour.
+
 | Capability | Real HTTP operation | Group | Effect |
 | --- | --- | --- | --- |
-| `data.read` | any `GET` | Data | Read business records |
+| `metadata.read` | metadata `GET` | Metadata | Read tables/fields/forms/views/plugins/layers (on by default) |
+| `data.read` | business-data `GET` | Data | Read business records |
 | `data.write` | `POST` / `PATCH` | Data | Create or update business records (high risk, no deletions) |
 | `optionValue.add` | `InsertOptionValue` | Option set | Add option values (global or field-local) |
 | `optionValue.updateLabel` | `UpdateOptionValue` | Option set | Change option labels |
@@ -44,14 +50,15 @@ Configured in `d365.config.json`:
 
 Tick them per environment under Permissions in the settings page; "Copy to all environments" is supported.
 
-## Two data gates
+## Three gates, one decision point
 
-The decision lives in one place, `lib/client.js`, so a new tool cannot bypass it:
+The decision lives in one place, `lib/client.js`, so a new tool cannot bypass it — every request (including "test connection" in the settings page) goes through it:
 
-- **Read**: if the entity set name in the request URL is not on the metadata allowlist (`EntityDefinitions`, `systemforms`, `savedqueries`, `webresourceset`, `solutions`, `msdyn_componentlayers`…), the request is blocked as business data and fails with `data-read-forbidden`;
+- **Metadata read**: the entity set name in the request URL is on the metadata allowlist (`EntityDefinitions`, `systemforms`, `savedqueries`, `webresourceset`, `solutions`, `msdyn_componentlayers`…) and requires `metadata.read`; it fails with `metadata-read-forbidden`;
+- **Business-data read**: every other `GET` is blocked as business data and requires `data.read`; it fails with `data-read-forbidden`;
 - **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`.
 
-Both gates fire **before a token is acquired**, so the request never reaches the environment.
+Every gate fires **before a token is acquired**, so the request never reaches the environment. Decisions are cached per environment for 2 seconds, so a change in the settings page applies to the next tool call.
 
 ## Two-step writes
 

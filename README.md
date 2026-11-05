@@ -5,7 +5,7 @@
 A **development and deployment assistant** for Dynamics 365 CE / Dataverse, installed as a [DeepSeek Harness](https://github.com/deepseek-ai) bundle.
 It turns a real D365 organization into something an agent can query directly: metadata, solution layers, snapshot diffs, references, migration risk, the impact of code changes, and controlled writes.
 
-> Fifteen tools, one settings page. Read-only by default: grant no capabilities and it can only look, not change.
+> Sixteen tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
 
 ```
 You: which forms and views still use the contoso_customertier field on account in DEV?
@@ -107,10 +107,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -188,23 +188,27 @@ For more phrasings you can copy straight into a conversation, see [examples/prom
 
 ## Permission model
 
-By default **read-only, and metadata-only**. Capabilities are granted per environment and live in `write.environments` of `d365.config.json`:
+By default **read-only**. Capabilities are granted per environment and live in `write.environments` of `d365.config.json`; the settings page renders one block per environment, separated by a rule:
 
 ```json
 {
   "write": {
+    "capabilityVersion": 2,
     "environments": {
-      "dev": ["data.read", "optionValue.add", "attribute.add"],
-      "sit": ["data.read"]
+      "dev": ["metadata.read", "data.read", "optionValue.add", "attribute.add"],
+      "sit": ["metadata.read", "data.read"]
     },
     "solutionUniqueName": "ContosoBase"
   }
 }
 ```
 
+An environment with no entry has never been configured and gets only `metadata.read`; an empty array revokes everything.
+
 | Capability | Operation | Effect |
 | --- | --- | --- |
-| `data.read` | any `GET` | Read business records; without it you can only read metadata |
+| `metadata.read` | metadata `GET` | Read tables / fields / forms / views / plugins / layers (on by default) |
+| `data.read` | business-data `GET` | Read business records; without it the records in tables are unreadable |
 | `data.write` | `POST` / `PATCH` | Create or update business records (no delete) |
 | `optionValue.add` | `InsertOptionValue` | Add an option value (global or attribute-local) |
 | `optionValue.updateLabel` | `UpdateOptionValue` | Change an option label |
@@ -217,7 +221,7 @@ By default **read-only, and metadata-only**. Capabilities are granted per enviro
 
 Writes take two steps: `plan-*` generates a plan read-only → a human confirms in the conversation (or the settings page) → `execute`. Before execution it checks whether the environment is importing/publishing and refuses if it is busy; every execution is recorded item by item in `.d365/changes/`, plans move through `pending → running → done/failed`, and a re-run does not submit twice.
 
-The decision lives in one place, `lib/client.js`: any entity set not known to be metadata is blocked as business data, and the block happens before the token is fetched. A new tool cannot bypass this gate.
+The decision lives in one place, `lib/client.js`: metadata requests need `metadata.read`, every other `GET` is blocked as business data unless `data.read` is granted, and writes additionally need `data.write`. All of it happens before the token is fetched, so a new tool cannot bypass these gates.
 
 See [docs/en/permissions.md](docs/en/permissions.md) for details.
 

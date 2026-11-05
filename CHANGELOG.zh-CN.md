@@ -4,6 +4,16 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.25.0
+
+元数据读取变成一项独立权限，权限页也从一个宽表改成按环境分块。
+
+- 新增能力 `metadata.read`（「读取元数据」），默认开启、排在权限页最前：关掉它连表、字段、表单、视图、层都读不到；至此每一次访问都会先查权限，请求没通过闸就到不了环境；
+- `lib/client.js` 一处判定：元数据实体集要 `metadata.read`（`metadata-read-forbidden`），其余 `GET` 要 `data.read`（`data-read-forbidden`），非 `GET` 的写要 `data.write`（`data-write-forbidden`）——都在取令牌之前；
+- 权限页每个环境单独一块、用分隔线隔开，块头显示该环境「已授权 x/y」；「元数据默认可读」的说明只在标题下出现一次；
+- `write.environments` 的条目改为三态：没有条目 = 未配置（元数据默认可读）、空数组 = 全部关掉、列表 = 只开列出的这些。之前空数组在读取时会被丢掉，等于悄悄把默认值又打开了；
+- `write.capabilityVersion`（2）用来区分「旧文件里的条目还没见过 metadata.read」：这些条目会被自动补上它，升级后行为不变。
+
 ## 0.24.1
 
 第一次真写 550 条全部失败：每个请求都返回 `0x80048d19 … A 'PrimitiveValue' node with non-null value was found when trying to read the value of the property 'contoso_bg'`。一条也没写进去，修好后用同一个计划重跑。

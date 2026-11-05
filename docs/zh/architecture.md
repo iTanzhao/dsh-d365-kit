@@ -76,7 +76,7 @@ tool-metadata.js
   → makeClient(env, config)           建客户端
   → resources.js 的查询定义            拼 path/params
   → client.getPagedWithSelectFallback 分页 + 列名降级
-      → 权限闸（非元数据实体集 → data.read）
+      → 权限闸（元数据实体集 → metadata.read；其余 GET → data.read；写 → data.write）
       → getAccessToken（按凭据指纹缓存）
       → fetch，429/5xx 按方法决定是否重试
   → 跨环境对齐 + 摘要

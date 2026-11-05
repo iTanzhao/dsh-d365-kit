@@ -4,13 +4,13 @@
 
 ## 默认姿态
 
-装好之后是**只读，而且只读元数据**：
+装好之后是**只读**：
 
-- 元数据（实体、字段、表单、视图、插件、解决方案、层、站点地图…）随时可读；
+- 元数据（实体、字段、表单、视图、插件、解决方案、层、站点地图…）由 `metadata.read` 控制，**默认开启**——没在配置里显式列出的环境视为已授权；
 - **业务记录**默认读不到，需要按环境授权 `data.read`；
 - 任何修改都需要按环境授权对应能力，且每次执行要人确认。
 
-「能看什么」和「能改什么」放在同一份按环境的能力表里，因为这两件事本来就该一起管。
+「能看什么」和「能改什么」放在同一份按环境的能力表里，因为这两件事本来就该一起管。页面上每个环境单独一块，用分隔线隔开。
 
 ## 能力表
 
@@ -19,9 +19,10 @@
 ```json
 {
   "write": {
+    "capabilityVersion": 2,
     "environments": {
-      "dev": ["data.read", "optionValue.add", "attribute.add", "view.columns"],
-      "sit": ["data.read"],
+      "dev": ["metadata.read", "data.read", "optionValue.add", "attribute.add", "view.columns"],
+      "sit": ["metadata.read", "data.read"],
       "uat": []
     },
     "solutionUniqueName": "ContosoBase"
@@ -29,9 +30,14 @@
 }
 ```
 
+- 环境**没有条目** = 还没配过，保持默认（只开 `metadata.read`）；
+- 环境条目是**空数组** = 全部关掉，连元数据也读不到；
+- `capabilityVersion` 由设置页保存时写入。旧文件（没有这个字段）里已有环境条目会被自动补上 `metadata.read`，也就是维持升级前的「元数据随时可读」行为。
+
 | 能力 | 真实 HTTP 操作 | 分组 | 作用 |
 | --- | --- | --- | --- |
-| `data.read` | 任意 `GET` | 数据 | 读取业务记录 |
+| `metadata.read` | 元数据 `GET` | 元数据 | 读表/字段/表单/视图/插件/解决方案层（默认开启） |
+| `data.read` | 业务数据 `GET` | 数据 | 读取业务记录 |
 | `data.write` | `POST` / `PATCH` | 数据 | 新建或修改业务记录（高危，不含删除） |
 | `optionValue.add` | `InsertOptionValue` | 选项集 | 新增选项值（全局或字段本地） |
 | `optionValue.updateLabel` | `UpdateOptionValue` | 选项集 | 改选项标签 |
@@ -44,14 +50,15 @@
 
 设置页「权限」里按环境勾选，支持「复制到其他环境」。
 
-## 两道数据闸
+## 三道闸，一处判定
 
-判定收在 `lib/client.js` 一处，新增工具绕不过去：
+判定收在 `lib/client.js` 一处，新增工具绕不过去——所有请求（含设置页里的「测试连接」）都从这里发出：
 
-- **读**：请求 URL 的实体集名不在元数据白名单（`EntityDefinitions`、`systemforms`、`savedqueries`、`webresourceset`、`solutions`、`msdyn_componentlayers`…）里，一律按业务数据拦截，报 `data-read-forbidden`；
+- **元数据读**：URL 的实体集名在元数据白名单（`EntityDefinitions`、`systemforms`、`savedqueries`、`webresourceset`、`solutions`、`msdyn_componentlayers`…）里，要求 `metadata.read`，报 `metadata-read-forbidden`；
+- **业务数据读**：其余 `GET` 一律按业务数据拦截，要求 `data.read`，报 `data-read-forbidden`；
 - **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`。
 
-拦截都发生在**取令牌之前**，不会把请求发到环境里。
+拦截都发生在**取令牌之前**，不会把请求发到环境里。判定结果按环境缓存 2 秒，设置页改了权限后下一次工具调用就生效。
 
 ## 两步写入
 

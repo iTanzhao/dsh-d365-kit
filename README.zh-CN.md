@@ -5,7 +5,7 @@
 Dynamics 365 CE / Dataverse 的**开发与部署助手**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 的 bundle 安装。
 它把一个真实的 D365 组织变成 agent 能直接查的东西：元数据、解决方案层、快照差异、引用关系、迁移风险、代码改动的影响面，以及受控的写入。
 
-> 十五个工具、一个设置页。默认只读：不勾权限，它只能看，不能改。
+> 十六个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
 
 ```
 你：DEV 的 account 上 contoso_customertier 这个字段，现在还有哪些表单和视图在用它？
@@ -107,10 +107,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -188,23 +188,27 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 
 ## 权限模型
 
-默认**只读，且只读元数据**。能力按环境授权，存在 `d365.config.json` 的 `write.environments`：
+默认**只读**。能力按环境授权，存在 `d365.config.json` 的 `write.environments`；设置页里每个环境单独一块，用分隔线隔开：
 
 ```json
 {
   "write": {
+    "capabilityVersion": 2,
     "environments": {
-      "dev": ["data.read", "optionValue.add", "attribute.add"],
-      "sit": ["data.read"]
+      "dev": ["metadata.read", "data.read", "optionValue.add", "attribute.add"],
+      "sit": ["metadata.read", "data.read"]
     },
     "solutionUniqueName": "ContosoBase"
   }
 }
 ```
 
+环境没有条目 = 还没配过，默认只开 `metadata.read`；条目是空数组 = 全关。
+
 | 能力 | 对应操作 | 作用 |
 | --- | --- | --- |
-| `data.read` | 任意 `GET` | 读业务记录；不授权时只能读元数据 |
+| `metadata.read` | 元数据 `GET` | 读表 / 字段 / 表单 / 视图 / 插件 / 层（默认开启） |
+| `data.read` | 业务数据 `GET` | 读业务记录；不授权时读不到表里的记录 |
 | `data.write` | `POST` / `PATCH` | 新建或修改业务记录（不含删除） |
 | `optionValue.add` | `InsertOptionValue` | 新增选项值（全局或字段本地） |
 | `optionValue.updateLabel` | `UpdateOptionValue` | 改选项标签 |
@@ -217,7 +221,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 
 写入是两步：`plan-*` 只读生成计划 → 人在对话（或设置页）确认后 `execute`。执行前会查环境是否正在导入/发布，忙则拒绝；每次执行逐条记进 `.d365/changes/`，计划有 `pending → running → done/failed` 状态，重跑不会重复提交。
 
-判定收在 `lib/client.js` 一处：不认识为元数据的实体集，一律按业务数据拦截，拦截发生在取令牌之前。新增工具绕不过这道闸。
+判定收在 `lib/client.js` 一处：先看是不是元数据请求（要 `metadata.read`），其余 `GET` 一律按业务数据拦截（要 `data.read`），非 `GET` 的写还要 `data.write`。拦截发生在取令牌之前，新增工具绕不过这三道闸。
 
 详见 [docs/permissions.md](docs/zh/permissions.md)。
 

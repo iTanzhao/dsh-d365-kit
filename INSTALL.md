@@ -19,7 +19,7 @@ For the complete steps, see [docs/en/installation.md](docs/en/installation.md).
 ### Option 1: Install from npm (shortest, upgradeable)
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
 ```
 
 This needs the package to be published to the registry pnpm uses — public npm or an internal mirror. The name has no scope, so no scope mapping is required.
@@ -29,7 +29,7 @@ This needs the package to be published to the registry pnpm uses — public npm 
 ### Option 2: Install from Git (no registry needed)
 
 ```
-plugin_manager install_bundle target="git+https://<your Git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your Git>/<group>/dsh-d365-kit.git#v0.25.0"
 ```
 
 ### Option 3: Install from a local directory
@@ -48,8 +48,9 @@ All paths are the same: **restart DSH once after installing**, so the Web client
 
 1. Settings → D365 Toolkit → Environments → Add environment: key (e.g. `dev`), URL, tenant ID, ClientId, client secret;
 2. Click "Test connection"; if you see a version number, the credentials are fine;
-3. On the "Permissions" tab, tick what this machine is allowed to do:
-   - "Read business data" — without it only metadata is readable, not the records in tables;
+3. On the "Permissions" tab, tick what this machine is allowed to do (one block per environment, separated by a rule):
+   - "Read metadata" — already ticked by default; untick it and tables, fields and views become unreadable too;
+   - "Read business data" — without it the records in tables are unreadable;
    - write capabilities are all off by default, and even when ticked every execution still needs a person to confirm it in the conversation;
 4. Click "Save".
 

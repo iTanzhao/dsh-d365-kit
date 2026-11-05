@@ -20,6 +20,7 @@ d365_health allEnvironments=true
 | --- | --- | --- |
 | `unknown-environment` | 环境 key 不存在 | `d365_envs` 看可用 key；设置页检查拼写 |
 | AADSTS 系列 / `invalid_client` | 凭据错、secret 过期、应用未授权 | 重新生成 secret；确认应用用户在**这个**环境里存在 |
+| `metadata-read-forbidden` | 该环境被关掉了「读取元数据」 | 设置页 → 权限 → 勾回「读取元数据」（默认开启，只有被显式取消才会报这个） |
 | `data-read-forbidden` | 该环境未授权读业务数据 | 设置页 → 权限 → 勾「读取业务数据」 |
 | `data-write-forbidden` | 未授权写业务数据 | 勾「新增/修改业务数据」；每次写入仍需确认 |
 | `environment-busy` | 环境正在导入/发布（`msdyn_solutionhistories` 有未结束记录） | 等它结束；确认是残留才用 `force: true` |

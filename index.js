@@ -47,8 +47,8 @@ import { register as registerHealth } from './lib/tool-health.js'
 import { register as registerReports } from './lib/tool-reports.js'
 import { register as registerDataSync } from './lib/tool-data-sync.js'
 import { registerRoutes } from './lib/settings-http.js'
-import { setDataReadResolver, setDataWriteResolver } from './lib/client.js'
-import { makeDataReadResolver, makeDataWriteResolver } from './lib/data-policy.js'
+import { setDataReadResolver, setDataWriteResolver, setMetadataReadResolver } from './lib/client.js'
+import { makeDataReadResolver, makeDataWriteResolver, makeMetadataReadResolver } from './lib/data-policy.js'
 
 export const name = 'dsh-d365-kit'
 
@@ -66,8 +66,9 @@ let routesAttached = false
 export function apply(ctx, config = {}) {
   const state = { rawConfig: config ?? {} }
 
-  // Business-data reads are off unless the policy file grants them per
-  // environment. Metadata reads never consult this resolver.
+  // Every request consults the policy file: metadata reads, business-record
+  // reads and writes are separate capabilities granted per environment.
+  setMetadataReadResolver(makeMetadataReadResolver(() => state.rawConfig))
   setDataReadResolver(makeDataReadResolver(() => state.rawConfig))
   setDataWriteResolver(makeDataWriteResolver(() => state.rawConfig))
 

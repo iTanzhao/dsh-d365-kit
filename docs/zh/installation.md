@@ -20,7 +20,7 @@
 ### 方式一：从 npm 安装（最短）
 
 ```bash
-plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
 ```
 
 前提是包已经发到 pnpm 配置的 registry——公网 npm 或内网镜像都行。包名没有 scope，不需要配 scope 映射。要装指定版本就写 `dsh-d365-kit@<版本>`。
@@ -30,7 +30,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
 ### 方式二：从 Git 安装（不需要 registry）
 
 ```bash
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
 ```
 
 DSH 用 pnpm 从 git 拉包。装完确认：
@@ -76,7 +76,7 @@ Host 侧工具在安装时就能用；**设置页**属于 Web 客户端插件，
 
 2. 点「测试连接」，返回组织名与版本号说明凭据正确。
 3. **保存**。密钥写进 `d365.secrets.json`，其余进 `d365.config.json`。
-4. 需要读业务记录时，到**权限**标签给该环境勾「读取业务数据」（默认关闭）。
+4. **权限**标签按环境分块列出能力：「读取元数据」默认开启（关掉后连表、字段、视图都查不到）；要读业务记录再勾「读取业务数据」（默认关闭）。
 5. 需要写入时，勾对应能力，并填「变更默认解决方案」（一个**已存在的未受管**解决方案唯一名）。
 
 ## 配置存在哪
@@ -128,7 +128,7 @@ d365_metadata resource=entities top=3
 ```bash
 # 从 Git 安装的
 plugin_manager remove_bundle target=dsh-d365-kit
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
 ```
 
 改版本号后必须**先 remove 再 install**：link/pnpm 认为包已存在时会返回 `already-installed`，不会替换代码。

@@ -76,7 +76,7 @@ tool-metadata.js
   → makeClient(env, config)           build the client
   → resources.js query definitions    build path/params
   → client.getPagedWithSelectFallback paging + column-name fallback
-      → permission gate (non-metadata entity sets → data.read)
+      → permission gate (metadata entity sets → metadata.read; other GETs → data.read; writes → data.write)
       → getAccessToken (cached per credential fingerprint)
       → fetch; 429/5xx retried per method
   → cross-environment alignment + summary

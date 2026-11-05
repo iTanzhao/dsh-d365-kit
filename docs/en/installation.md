@@ -20,7 +20,7 @@ A read-only application user is enough; for the write capabilities, messages suc
 ### Option 1: install from npm (shortest)
 
 ```bash
-plugin_manager install_bundle target="dsh-d365-kit@0.24.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.25.0"
 ```
 
 Works once the package is published to the registry pnpm is configured against â€” public npm or an internal mirror. The package has no scope, so no scope mapping is needed. To install a specific version pin it as `dsh-d365-kit@<version>`.
@@ -30,7 +30,7 @@ Works once the package is published to the registry pnpm is configured against â
 ### Option 2: install from Git (no registry needed)
 
 ```bash
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
 ```
 
 DSH pulls the package from git with pnpm. After installing, check:
@@ -76,7 +76,7 @@ After restarting, open Settings and you should see "D365 Toolkit". If it is miss
 
 2. Click "Test connection"; an organization name and version number coming back means the credentials are correct.
 3. **Save**. The secret goes into `d365.secrets.json`, everything else into `d365.config.json`.
-4. To read business records, go to the **Permissions** tab and tick "Read business data" for that environment (off by default).
+4. The **Permissions** tab lists capabilities per environment: "Read metadata" is on by default (turn it off and tables, fields and views become unreadable); tick "Read business data" to read records (off by default).
 5. To write, tick the matching capabilities and fill in "Default solution for changes" (the unique name of an **existing unmanaged** solution).
 
 ## Where the configuration lives
@@ -128,7 +128,7 @@ If both return content, it works. The first `d365_sync` pulls the full metadata 
 ```bash
 # installed from Git
 plugin_manager remove_bundle target=dsh-d365-kit
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.24.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.25.0"
 ```
 
 After changing the version number you must **remove first, then install**: link/pnpm returns `already-installed` when it believes the package exists, and does not replace the code.

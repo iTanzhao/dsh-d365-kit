@@ -20,6 +20,7 @@ The first shows whether the plugin is present and active; the second checks cred
 | --- | --- | --- |
 | `unknown-environment` | The environment key does not exist | Use `d365_envs` to list available keys; check the spelling on the settings page |
 | AADSTS series / `invalid_client` | Wrong credentials, expired secret, or application not authorized | Regenerate the secret; confirm the application user exists in **this** environment |
+| `metadata-read-forbidden` | "Read metadata" is turned off for this environment | Settings page → Permissions → tick it back (on by default; this only fires when it was explicitly revoked) |
 | `data-read-forbidden` | This environment is not authorized to read business data | Settings page → Permissions → enable "Read business data" |
 | `data-write-forbidden` | Not authorized to write business data | Enable "Create/Edit business data"; every write still needs confirmation |
 | `environment-busy` | The environment is importing/publishing (`msdyn_solutionhistories` has an unfinished record) | Wait for it to finish; use `force: true` only after confirming it is a leftover |

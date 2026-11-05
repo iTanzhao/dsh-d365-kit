@@ -83,7 +83,10 @@ window.__ModuleLoader__.load({
         'existing': 'already saved',
         'keyHint': 'Short key the tools use, e.g. dev.',
         'write.title': 'Write permissions',
-        'write.desc': 'Choose what this machine may do in each environment. Metadata reads are always allowed; business records need "Read business data". Metadata changes need a capability here and still require a confirm click.',
+        'write.desc': 'Choose what this machine may do in each environment. Metadata reads are on by default; business records need "Read business data". Metadata changes need a capability here and still require a confirm click.',
+        'write.gate': 'Every request is checked against the target environment\'s grants below before it leaves this machine; a tool cannot skip the check.',
+        'write.envSummary': '{granted} of {total} granted',
+        'write.envNote': 'Metadata (tables, fields, forms, views, plugins, solution layers) needs "Read metadata", ticked by default. Untick everything to block even metadata. Business records need "Read business data"; a write also needs its capability here plus a confirm click in the chat.',
         'write.noEnvironments': 'Add an environment first.',
         'write.solution': 'Default solution for changes',
         'write.solutionHint': 'Solution unique name, so exported solutions carry the change',
@@ -210,7 +213,10 @@ window.__ModuleLoader__.load({
         'existing': '已保存',
         'keyHint': '工具里用的短名，例如 dev。',
         'write.title': '权限',
-        'write.desc': '选择这台机器可以对哪些环境做什么。只读元数据的工具始终可用；读取业务数据需要勾「读取业务数据」；元数据修改需要先在这里授权，执行前仍要确认。',
+        'write.desc': '选择这台机器可以对哪些环境做什么。元数据默认可读；读取业务数据需要勾「读取业务数据」；元数据修改需要先在这里授权，执行前仍要确认。',
+        'write.gate': '每一次访问在发出前都会按目标环境核对下面的勾选，任何工具都绕不过这道检查。',
+        'write.envSummary': '已授权 {granted}/{total}',
+        'write.envNote': '元数据（表、字段、表单、视图、插件、解决方案层）归「读取元数据」管，默认勾上；全部取消就什么都查不到。业务记录需要勾「读取业务数据」；写操作除勾选外，还要在对话里点确认。',
         'write.noEnvironments': '请先添加环境。',
         'write.solution': '变更默认解决方案',
         'write.solutionHint': '解决方案唯一名：填了，导出的解决方案才会带上这次改动',
@@ -791,8 +797,17 @@ window.__ModuleLoader__.load({
 
           const nextDraft = {}
           for (const key of policy.environments ?? []) {
-            const granted = new Set(policy.policy?.environments?.[key] ?? [])
-            nextDraft[key] = Object.fromEntries(Object.keys(policy.capabilities ?? {}).map((capability) => [capability, granted.has(capability)]))
+            // An environment with no entry has never been configured: it keeps
+            // the default metadata read. An entry, even an empty one, is the
+            // whole truth.
+            const explicit = policy.policy?.environments?.[key]
+            const granted = Array.isArray(explicit) ? explicit : null
+            nextDraft[key] = Object.fromEntries(
+              Object.keys(policy.capabilities ?? {}).map((capability) => [
+                capability,
+                granted ? granted.includes(capability) : capability === 'metadata.read',
+              ]),
+            )
           }
           setCapabilities(policy.capabilities ?? {})
           setEnvironments(policy.environments ?? [])
@@ -853,38 +868,61 @@ window.__ModuleLoader__.load({
         groups[group].push([capability, meta])
       }
 
-      const capabilityRows = environments.map((envKey) => h('tr', { key: envKey },
-        h('td', { style: { padding: '6px 10px 6px 0', fontSize: '12px', color: T.text, whiteSpace: 'nowrap', verticalAlign: 'top' } }, envKey),
-        h('td', { style: { padding: '6px 0' } },
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-            Object.entries(groups).map(([group, entries]) => h('div', { key: group || '-', style: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' } },
-              group ? h('span', { style: { fontSize: '11px', color: T.muted, minWidth: '48px' } }, group) : null,
-              entries.map(([capability, meta]) => h('label', {
-                key: capability,
-                style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: T.muted },
-                title: meta.description,
-              },
-              h('input', {
-                type: 'checkbox',
-                checked: Boolean(draft[envKey]?.[capability]),
-                onChange: () => toggle(envKey, capability),
-              }),
-              meta.label,
-              meta.risk === 'high' ? h('span', { style: { color: T.error } }, t('write.highRisk')) : null,
-              )),
-            )),
-          ),
+      const totalCapabilities = Object.keys(capabilities).length
+
+      // Permissions are per-environment, so each environment gets its own
+      // block, separated by a rule: a single wide table made one environment's
+      // row run into the next.
+      const environmentBlocks = environments.map((envKey, index) => {
+        const granted = Object.values(draft[envKey] ?? {}).filter(Boolean).length
+        return h('div', {
+          key: envKey,
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            paddingTop: index === 0 ? 0 : '16px',
+            borderTop: index === 0 ? 'none' : `1px solid ${T.border}`,
+          },
+        },
+        h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } },
+          h('span', { style: { fontSize: '13px', fontWeight: 600, color: T.text } }, envKey),
+          h('span', { style: { fontSize: '11px', color: T.muted } }, t('write.envSummary', { granted, total: totalCapabilities })),
         ),
-      ))
+        h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+          Object.entries(groups).map(([group, entries]) => h('div', {
+            key: group || '-',
+            style: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' },
+          },
+          group ? h('span', { style: { fontSize: '11px', color: T.muted, minWidth: '48px' } }, group) : null,
+          entries.map(([capability, meta]) => h('label', {
+            key: capability,
+            style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: T.muted },
+            title: meta.description,
+          },
+          h('input', {
+            type: 'checkbox',
+            checked: Boolean(draft[envKey]?.[capability]),
+            onChange: () => toggle(envKey, capability),
+          }),
+          meta.label,
+          meta.risk === 'high' ? h('span', { style: { color: T.error } }, t('write.highRisk')) : null,
+          )),
+        )),
+        ),
+        )
+      })
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         h('div', null,
           h('h3', { style: { margin: 0, fontSize: '14px', color: T.text } }, t('write.title')),
           h('p', { style: { margin: '4px 0 0', fontSize: '12px', color: T.muted, lineHeight: 1.5 } }, t('write.desc')),
+          h('p', { style: { margin: '4px 0 0', fontSize: '11px', color: T.muted, lineHeight: 1.6 } }, t('write.gate')),
+          h('p', { style: { margin: '2px 0 0', fontSize: '11px', color: T.muted, lineHeight: 1.6 } }, t('write.envNote')),
         ),
 
-        capabilityRows.length
-          ? h('div', { style: { overflowX: 'auto' } }, h('table', { style: { borderCollapse: 'collapse' } }, h('tbody', null, capabilityRows)))
+        environmentBlocks.length
+          ? h('div', { style: { display: 'flex', flexDirection: 'column' } }, environmentBlocks)
           : h(Hint, null, t('write.noEnvironments')),
 
         h('div', { style: { maxWidth: '420px' } },
