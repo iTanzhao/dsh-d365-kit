@@ -8,7 +8,7 @@ Conventions:
 
 - **Environment parameters**: `environment` (single), `environments` (array), `allEnvironments` (all). When omitted, the configured default environment is used.
 - **Read vs. write**: only `d365_write execute` and `d365_data_write` change an environment, and each must be approved by a human on a confirmation card.
-- **Artifacts**: `<workspace>/.d365/`. File paths are returned and can be opened directly with the file tools.
+- **Artifacts**: `<workspace>/.d365/`. Paths are returned as **absolute paths** and can be opened directly with the file tools.
 
 ---
 
@@ -82,7 +82,8 @@ A few real constraints:
 
 - The metadata endpoints (`EntityDefinitions`) **do not accept** `$orderby` and `$top`; the client falls back and retries step by step;
 - Display names are multilingual, so compare across environments by **logical name**, not display name;
-- Entity set names can be customized; do not hard-code the plural form — use the `entities` resource or `d365_data`'s automatic resolution.
+- Entity set names can be customized; do not hard-code the plural form — use the `entities` resource or `d365_data`'s automatic resolution;
+- `workflows` / `business_rules` return the **definition row only** by default (`type eq 1`): Dataverse stores a second, same-named activation row (`type eq 2`, different `workflowid`) for every process, which otherwise looks like a duplicate and doubles the count. An explicit `filter` (e.g. `type eq 2`) replaces the default instead of ANDing with it, so it never collapses to an empty result.
 
 ---
 
@@ -109,6 +110,8 @@ Queries `msdyn_componentlayer`: which solutions have overridden a component, the
 ```
 
 Rows are returned in ascending `msdyn_order`; the last layer is the one currently in effect; `(system layer)` means the layer does not come from any solution.
+
+In a multi-environment query, an environment that lacks the component (name not found) only reports "this environment does not have this component"; the other environments still return their layers and take part in the comparison. The call only fails when every environment lacks it.
 
 Known limitation: in some environments the table is readable but returns 0 rows; administrator identity is required to see the data.
 
@@ -380,7 +383,10 @@ Environment health: "is it safe to touch this environment right now".
 { "allEnvironments": true, "hours": 24 }
 ```
 
-Per environment it reports: version, organization name, number of suspended jobs, recent failure count (merged by job name), solutions currently importing / publishing, and recently installed solutions.
+Per environment it reports: version, organization name, queued (Ready) jobs, suspended jobs, recent failure count (merged by job name), solutions currently importing / publishing, and recently installed solutions.
+
+Failures are `statecode 3` (Completed) **and** `statuscode 31` (Failed): the same Completed state also covers 30 Succeeded and 32 Canceled, so matching on `statecode` alone counts and lists succeeded jobs as failures.
+
 The same "importing / publishing" determination is reused by the pre-write check.
 
 ---

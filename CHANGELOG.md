@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.22.2
+
+Correctness fixes found against a real UAT organization.
+
+- `d365_health` no longer reports Completed async jobs as failures, or Ready jobs as suspended: `asyncoperation` uses `statecode` 0 Ready / 1 Suspended / 3 Completed, and failure is `statuscode 31` (Completed also covers 30 Succeeded and 32 Canceled). On the UAT org "recent failures" dropped from 59,293 to 124 — exactly what `statecode eq 3 and statuscode eq 31` reports — and the failure list no longer contains succeeded jobs (one listed job had 577/577 rows at statuscode 30). Ready jobs get their own "queued" column, and failures carry the real `operationtype`;
+- `d365_metadata` resource `workflows` (and `business_rules`) now returns only the definition row (`type eq 1`) by default: Dataverse stores a second, same-named activation row (`type 2`, different `workflowid`) for every process, so each one appeared twice and counts doubled. An explicit `filter` replaces the default instead of ANDing with it (so `type eq 2` works), and `type` is a displayed column;
+- `d365_layers` no longer aborts a multi-environment query when one environment lacks the component: a 404 on the keyed metadata lookup means "absent here", it is reported for that environment only, and the other environments still return their layers and take part in the comparison. The call fails only when every environment lacks it;
+- artifact paths are absolute (`writeArtifact`), so the path printed in a result can be opened from the session workspace instead of `../../../Documents/...` relative to the plugin's cwd.
+
 ## 0.22.1
 
 Packaging for npm.

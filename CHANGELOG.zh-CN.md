@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.22.2
+
+真实 UAT 环境上发现的问题修复。
+
+- `d365_health` 不再把 Completed 的异步作业算成失败、把 Ready 算成挂起：`asyncoperation` 的 `statecode` 是 0 Ready / 1 Suspended / 3 Completed，失败要再看 `statuscode 31`（Completed 下还有 30 Succeeded、32 Canceled）。在 UAT 上「近期失败」从 59,293 降到 124——正是 `statecode eq 3 and statuscode eq 31` 的条数——失败清单也不再混入成功的作业（原先列出的某作业 577/577 行都是 statuscode 30）。Ready 的作业单独有「排队中」一列，失败行带上真实的 `operationtype`；
+- `d365_metadata` 的 `workflows`（以及 `business_rules`）默认只返回定义行（`type eq 1`）：Dataverse 给每个流程另存一条同名、`workflowid` 不同的激活行（`type 2`），于是每个流程出现两次、计数翻倍。显式传 `filter` 时默认过滤让位而不是 AND（所以 `type eq 2` 可用），`type` 也进入展示列；
+- `d365_layers` 在多环境查询时，某个环境没有该组件不再让整次调用失败：键值元数据查询的 404 视为「该环境没有」，只在该环境报告，其它环境照常返回层并参与对比；全部环境都没有才报错；
+- 产物路径改为绝对路径（`writeArtifact`），返回里打印的路径可以直接从会话工作区打开，不再是相对插件 cwd 的 `../../../Documents/...`。
+
 ## 0.22.1
 
 按 npm 包的要求补齐。
