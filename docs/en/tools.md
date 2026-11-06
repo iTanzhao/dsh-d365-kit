@@ -117,7 +117,7 @@ Rows are returned in ascending `msdyn_order`; the last layer is the one currentl
 
 `Active` is the pseudo solution name Dataverse uses for an **unmanaged customization layer**: when present it always sits on top, covering the managed layers below, and it is the only layer `d365_write plan-remove-layer` can delete. The output therefore labels it `Active (unmanaged)` and states explicitly whether the top layer is unmanaged or whether "this environment has no unmanaged layer" — the latter means the component is fully driven by solutions here. An Active layer's `msdyn_overwritetime` is always `1900-01-01` (the service does not record it), so the timestamp is shown as "not recorded" instead of a fake date.
 
-`OptionSet` resolves **global** option sets only (via `GlobalOptionSetDefinitions(Name='…')` to get the `MetadataId`); local option sets live with their column, so use `componentType=Attribute` plus `entity` to inspect a column's layers. Option sets support reading layers only — removing their layer is not exposed yet (see `plan-remove-layer`).
+`OptionSet` resolves **global** option sets only (via `GlobalOptionSetDefinitions(Name='…')` to get the `MetadataId`); local option sets live with their column, so use `componentType=Attribute` plus `entity` to inspect a column's layers. Their layer can be removed too (`d365_write plan-remove-layer` with `componentType: OptionSet`).
 
 In a multi-environment query, an environment that lacks the component (name not found) only reports "this environment does not have this component"; the other environments still return their layers and take part in the comparison. The call only fails when every environment lacks it.
 
@@ -313,7 +313,7 @@ Metadata changes. **`plan-*` actions are read-only** and only produce a plan; `e
 | `plan-delete-attribute` | `entity`, `attribute`, `acknowledge: true` | Delete a field (high risk) |
 | `plan-update-entity` | `entity`, `displayName` | Change the table display name and description |
 | `plan-view-columns` | `view`, `addColumns` / `removeColumns` | Add or remove system view columns |
-| `plan-remove-layer` | `component`, `componentType` (Entity/Attribute), `acknowledge: true` | Remove the top-most unmanaged layer of a component (high risk) |
+| `plan-remove-layer` | `component`, `componentType` (11 types, see the end of this section), `acknowledge: true` | Remove the top-most unmanaged layer of a component (high risk) |
 | `list` | — | List pending plans |
 | `execute` | `planId` | Show a confirmation card and run after approval |
 | `cancel` | `planId` | Cancel a pending plan |
@@ -356,15 +356,29 @@ Common parameters:
 { "action": "execute", "planId": "mw04aul6-1ci6aa" }
 ```
 
-`plan-remove-layer` removes **only the top layer, and only when it reads `Active`** (the unmanaged customizations layer); whatever solution layer sits below becomes active again:
+`plan-remove-layer` removes **only the top layer, and only when it reads `Active`** (the unmanaged customizations layer); whatever solution layer sits below becomes active again. It covers every component type `d365_layers` knows:
+
+| `componentType` | `component` holds | Published after removal |
+| --- | --- | --- |
+| `Entity` (default) | table logical name | that table |
+| `Attribute` | column logical name (with `entity`) | that table |
+| `OptionSet` | global option set name | that option set |
+| `SystemForm` | form name | the form's table (nothing when the form belongs to no table) |
+| `SavedQuery` | view name | the view's table |
+| `Workflow` | process name | everything |
+| `WebResource` | web resource name | everything |
+| `PluginAssembly` | assembly name | everything |
+| `PluginType` | type full name | everything |
+| `SdkMessageProcessingStep` | step name | everything |
+| `CustomAPI` | unique name | everything |
 
 | Parameter | Meaning |
 | --- | --- |
-| `componentType` | `Entity` (table) or `Attribute` (column), defaults to `Entity` |
-| `component` | Table logical name; for an attribute, the column logical name |
+| `componentType` | see the table above, defaults to `Entity` |
+| `component` | see the table above |
 | `entity` | Required when `componentType: Attribute`: the table owning that column |
 
-The plan lists the layer stack, the layer being removed, and what becomes active next (or "system definition" when nothing is below). If the top layer is not `Active` the plan is refused: that layer belongs to a solution — remove the component from that solution, or ship a patch that overrides it. Removing a layer cannot be undone; the affected table is published afterwards.
+The plan lists the layer stack, the layer being removed, and what becomes active next (or "system definition" when nothing is below). If the top layer is not `Active` the plan is refused: that layer belongs to a solution — remove the component from that solution, or ship a patch that overrides it. Removing a layer cannot be undone; the scope above is published afterwards — a single table only when its ownership is known, otherwise a full publish (slower, but nothing is missed).
 
 Write details, confirmation cards and publish scope are covered in [permissions.md](permissions.md).
 

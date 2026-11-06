@@ -19,7 +19,7 @@ For the complete steps, see [docs/en/installation.md](docs/en/installation.md).
 ### Option 1: Install from npm (shortest, upgradeable)
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.27.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.28.0"
 ```
 
 This needs the package to be published to the registry pnpm uses — public npm or an internal mirror. The name has no scope, so no scope mapping is required.
@@ -29,7 +29,7 @@ This needs the package to be published to the registry pnpm uses — public npm 
 ### Option 2: Install from Git (no registry needed)
 
 ```
-plugin_manager install_bundle target="git+https://<your Git>/<group>/dsh-d365-kit.git#v0.27.0"
+plugin_manager install_bundle target="git+https://<your Git>/<group>/dsh-d365-kit.git#v0.28.0"
 ```
 
 ### Option 3: Install from a local directory

@@ -117,7 +117,7 @@
 
 `Active` 是 Dataverse 给**未受管的自定义层**用的伪解决方案名：它存在时永远在最上面，盖住下面的受管层，也是唯一可以用 `d365_write plan-remove-layer` 删掉的一层。因此输出里会标成 `Active（未受管）`，并单独说明「最上层是未受管层」还是「该环境没有未受管层」——后者表示这个组件在这里完全跟着解决方案走。Active 层的 `msdyn_overwritetime` 恒为 `1900-01-01`（服务端不记录），更新时间显示为「不记录」而不是一个假的日期。
 
-`OptionSet` 只解析**全局**选项集（走 `GlobalOptionSetDefinitions(Name='…')` 取 `MetadataId`）；本地选项集随字段存在，用 `componentType=Attribute` + `entity` 查字段的层。选项集目前只支持查层，删层未开放（见 `d365_write` 的 `plan-remove-layer`）。
+`OptionSet` 只解析**全局**选项集（走 `GlobalOptionSetDefinitions(Name='…')` 取 `MetadataId`）；本地选项集随字段存在，用 `componentType=Attribute` + `entity` 查字段的层。选项集也可以删层（`d365_write plan-remove-layer`，`componentType: OptionSet`）。
 
 多环境查询时，某个环境没有该组件（按名称找不到）只会让**该环境**报「该环境没有这个组件」，其它环境照常返回并参与对比；全部环境都找不到才报错。
 
@@ -313,7 +313,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 | `plan-delete-attribute` | `entity`、`attribute`、`acknowledge: true` | 删除字段（高危） |
 | `plan-update-entity` | `entity`、`displayName` | 改表显示名与描述 |
 | `plan-view-columns` | `view`、`addColumns` / `removeColumns` | 增删系统视图的列 |
-| `plan-remove-layer` | `component`、`componentType`（Entity/Attribute）、`acknowledge: true` | 移除组件最上面的未受管自定义层（高危） |
+| `plan-remove-layer` | `component`、`componentType`（11 类，见本节末）、`acknowledge: true` | 移除组件最上面的未受管自定义层（高危） |
 | `list` | — | 列待确认计划 |
 | `execute` | `planId` | 弹确认卡片，批准后执行 |
 | `cancel` | `planId` | 取消待确认计划 |
@@ -356,15 +356,29 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 { "action": "execute", "planId": "mw04aul6-1ci6aa" }
 ```
 
-`plan-remove-layer` 只删**最上面那一层、且必须显示为 `Active`**（未受管的自定义层），删完由下面那层重新生效：
+`plan-remove-layer` 只删**最上面那一层、且必须显示为 `Active`**（未受管的自定义层），删完由下面那层重新生效。支持 `d365_layers` 认识的全部组件类型：
+
+| `componentType` | `component` 取什么 | 执行后发布范围 |
+| --- | --- | --- |
+| `Entity`（默认） | 表逻辑名 | 该表 |
+| `Attribute` | 字段逻辑名（配 `entity`） | 该表 |
+| `OptionSet` | 全局选项集名称 | 该选项集 |
+| `SystemForm` | 表单名称 | 表单所属的表（不归属任何表时不指定） |
+| `SavedQuery` | 视图名称 | 视图所属的表 |
+| `Workflow` | 流程名称 | 全量发布 |
+| `WebResource` | Web 资源名称 | 全量发布 |
+| `PluginAssembly` | 程序集名称 | 全量发布 |
+| `PluginType` | 类型全名 | 全量发布 |
+| `SdkMessageProcessingStep` | 步骤名称 | 全量发布 |
+| `CustomAPI` | 唯一名 | 全量发布 |
 
 | 参数 | 说明 |
 | --- | --- |
-| `componentType` | `Entity`（表）或 `Attribute`（字段），默认 `Entity` |
-| `component` | 表逻辑名；`Attribute` 时是字段逻辑名 |
+| `componentType` | 见上表，默认 `Entity` |
+| `component` | 见上表 |
 | `entity` | `componentType: Attribute` 时必填：字段所属的表 |
 
-计划会写出层栈、被删的层、以及之后生效的是哪一层（没有下层就是「系统定义」）。最上层若不是 `Active` 会直接拒绝：那种层属于某个解决方案，要在解决方案里移除组件，或导入一个新 patch 覆盖它。删层不可恢复，执行后按受影响的表发布。
+计划会写出层栈、被删的层、以及之后生效的是哪一层（没有下层就是「系统定义」）。最上层若不是 `Active` 会直接拒绝：那种层属于某个解决方案，要在解决方案里移除组件，或导入一个新 patch 覆盖它。删层不可恢复，执行后按上表的范围发布——只有能确定归属时才发布单张表，其余走全量发布（慢一点但不会漏）。
 
 写入细节、确认卡片、发布范围见 [permissions.md](permissions.md)。
 

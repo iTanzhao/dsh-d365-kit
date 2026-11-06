@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.28.0
+
+Removing an unmanaged layer now works for every component type, not just tables and columns.
+
+- `d365_write plan-remove-layer` accepts all eleven `componentType` values (`Entity`, `Attribute`, `OptionSet`, `SavedQuery`, `Workflow`, `SystemForm`, `WebResource`, `PluginType`, `PluginAssembly`, `SdkMessageProcessingStep`, `CustomAPI`); the numeric `ComponentType` each one sends to `RemoveActiveCustomizations` comes from the `solutioncomponent.componenttype` picklist read from the live service, not from guesswork (CustomAPI carries its table's object type code, 10519);
+- The plan now renders the whole layer stack before the operation and names what takes over after removal, so the destructive step is reviewable without opening the JSON;
+- Publish scope after removal follows the component: a table or column publishes that table, a form or view publishes its owning table, an option set publishes that option set, and everything else publishes the whole environment — an unknown or unowned component falls back to a full publish rather than a wrong narrowed one;
+- Fixed: a form that belongs to no table made Dataverse answer `objecttypecode` with the literal `none`, which the publish step would have passed on as a table name; it now reads as "no narrowed scope".
+
 ## 0.27.0
 
 Global option sets got their layers, the layer output says what `Active` means, and a token is fetched once instead of once per request.

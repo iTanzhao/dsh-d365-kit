@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.28.0
+
+删未受管层不再只限表和字段，`d365_layers` 认识的组件类型全部支持。
+
+- `d365_write plan-remove-layer` 接受全部 11 种 `componentType`（`Entity`、`Attribute`、`OptionSet`、`SavedQuery`、`Workflow`、`SystemForm`、`WebResource`、`PluginType`、`PluginAssembly`、`SdkMessageProcessingStep`、`CustomAPI`）；发给 `RemoveActiveCustomizations` 的数值 `ComponentType` 取自真实服务上的 `solutioncomponent.componenttype` 选项集，不是猜的（`CustomAPI` 用它所在表自身的 object type code，10519）；
+- 计划里先完整列出层栈，再说明删完由哪一层接管，删之前不用打开 JSON 也能核；
+- 删除后的发布范围跟着组件走：表或字段发布该表，表单或视图发布其所属表，选项集发布该选项集，其余走全量发布——归属查不到时不猜，退回全量发布而不是发错范围；
+- 修复：不归属任何表的表单，Dataverse 的 `objecttypecode` 会返回字面量 `none`，原先会被当成表名传进发布；现在按「不缩小发布范围」处理。
+
 ## 0.27.0
 
 全局选项集能查层了，层输出说清了 `Active` 是什么，令牌也从「每个请求取一次」改成「并发只取一次」。
