@@ -66,6 +66,7 @@
 | --- | --- | --- | --- |
 | `resource` | enum（上表） | 必填 | 查哪一类 |
 | `entity` | string | — | 实体逻辑名，用于 attributes / keys / relationships / forms / views / workflows 等 |
+| `name` | string | — | 按名称精确取一条（目前只有 `option_sets`：走 keyed read，一次请求取一个全局选项集，不用把 900 多个定义全拉下来） |
 | `filter` | string | — | 额外的 OData `$filter`，不带 `$filter=`，如 `contains(name,'审批')` |
 | `select` | string | — | 额外返回的列，逗号分隔；列名写错会自动降级重试 |
 | `orderby` | string | — | 覆盖默认排序，如 `modifiedon desc` |
@@ -84,6 +85,8 @@
 - 显示名有多语言，跨环境比较请用**逻辑名**，不要用显示名；
 - 实体集名可被自定义，不要硬编码复数形式，用 `entities` 资源或 `d365_data` 的自动解析；
 - `workflows` / `business_rules` 默认只取**定义行**（`type eq 1`）：Dataverse 给每个流程另存一条同名、不同 `workflowid` 的激活行（`type eq 2`），不过滤会看起来像重复、计数也会翻倍；显式传 `filter`（如 `type eq 2`）时默认过滤自动让位，不会 AND 成空集。
+- `option_sets`（`GlobalOptionSetDefinitions`）**不接受** `$filter`（服务端直接返回 HTTP 405：`The query parameter $filter is not supported`），所以 `filter` 会被当场拒绝并提示改用 `name`。按名称取是 keyed read，找不到返回 404，工具会报「该环境没有名为 X 的全局选项集定义」而不是空表。
+- 要一次看全部 987 个定义、或要选项值时：全量用不带 `filter`/`name` 的查询；单个定义的选项值目前要用 cast 路径（`GlobalOptionSetDefinitions(<id>)/Microsoft.Dynamics.CRM.OptionSetMetadata?$select=Options`），工具暂未封装。
 
 ---
 
@@ -95,8 +98,8 @@
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `component` | string | 组件名或 GUID。Entity 用逻辑名；其它类型用该类记录的名称/唯一名 |
-| `componentType` | enum | `Entity`、`Attribute`、`SystemForm`、`SavedQuery`、`Workflow`、`WebResource`、`PluginAssembly`、`PluginType`、`SdkMessageProcessingStep`、`CustomAPI` |
+| `component` | string | 组件名或 GUID。Entity 用逻辑名；其它类型用该类记录的名称/唯一名；`OptionSet` 用全局选项集名称 |
+| `componentType` | enum | `Entity`、`Attribute`、`SystemForm`、`SavedQuery`、`Workflow`、`WebResource`、`PluginAssembly`、`PluginType`、`SdkMessageProcessingStep`、`CustomAPI`、`OptionSet` |
 | `entity` | string | `componentType=Attribute` 时必填 |
 | `solution` | string | 只看某个解决方案的层（结果内过滤） |
 | `includeJson` | boolean | 同时取 `msdyn_componentjson`（完整定义，可能很大，写文件） |
@@ -107,9 +110,14 @@
 { "component": "account", "componentType": "Entity", "allEnvironments": true }
 { "componentType": "Attribute", "component": "name", "entity": "account" }
 { "componentType": "SystemForm", "component": "Account" }
+{ "componentType": "OptionSet", "component": "contoso_taxcategoryos", "allEnvironments": true }
 ```
 
 返回按 `msdyn_order` 升序，最后一层是当前生效层；`（系统层）` 表示该层不来自任何解决方案。
+
+`Active` 是 Dataverse 给**未受管的自定义层**用的伪解决方案名：它存在时永远在最上面，盖住下面的受管层，也是唯一可以用 `d365_write plan-remove-layer` 删掉的一层。因此输出里会标成 `Active（未受管）`，并单独说明「最上层是未受管层」还是「该环境没有未受管层」——后者表示这个组件在这里完全跟着解决方案走。Active 层的 `msdyn_overwritetime` 恒为 `1900-01-01`（服务端不记录），更新时间显示为「不记录」而不是一个假的日期。
+
+`OptionSet` 只解析**全局**选项集（走 `GlobalOptionSetDefinitions(Name='…')` 取 `MetadataId`）；本地选项集随字段存在，用 `componentType=Attribute` + `entity` 查字段的层。选项集目前只支持查层，删层未开放（见 `d365_write` 的 `plan-remove-layer`）。
 
 多环境查询时，某个环境没有该组件（按名称找不到）只会让**该环境**报「该环境没有这个组件」，其它环境照常返回并参与对比；全部环境都找不到才报错。
 

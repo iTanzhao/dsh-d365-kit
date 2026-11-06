@@ -4,6 +4,17 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.27.0
+
+全局选项集能查层了，层输出说清了 `Active` 是什么，令牌也从「每个请求取一次」改成「并发只取一次」。
+
+- `d365_layers` 支持 `componentType: OptionSet`：先用 `GlobalOptionSetDefinitions(Name='…')` 取 `MetadataId`，再按 `msdyn_solutioncomponentname = 'OptionSet'` 查层表。本地选项集跟着字段走，仍用 `componentType: Attribute` 加 `entity` 查；
+- 层输出把未受管层标成 `Active（未受管）`，每个环境末尾明确一句：最上层是未受管层，还是这个环境根本没有未受管层。Active 层的更新时间显示「不记录」（它的 `msdyn_overwritetime` 恒为 `1900-01-01`，原来会渲染成一个假日期）；
+- `d365_metadata` 的 `option_sets` 新增 `name` 参数：一次 keyed 请求取一个，不用再拉全部 987 个；找不到返回 404，报「该环境没有名为 X 的全局选项集定义」；
+- 给 `option_sets` 传 `filter` 会被当场拒绝（`filter-unsupported`），不再把原始的 `$filter is not supported` 抛给用户——该端点返回 HTTP 405；
+- 取令牌改成并发合流：同一环境的并发请求共用一个令牌请求（实测 8 个并发原本发 8 次 OAuth，现在 1 次），提前刷新窗口从 1 分钟放宽到 2 分钟；
+- `d365_layers` 的 description 现在列出全部 11 种支持的组件类型，传错 `componentType` 不必再靠一次失败去发现。
+
 ## 0.26.0
 
 解决方案层现在可写了，但只开一种：移除未受管的自定义层。

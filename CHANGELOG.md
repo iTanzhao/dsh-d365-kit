@@ -4,6 +4,17 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.27.0
+
+Global option sets got their layers, the layer output says what `Active` means, and a token is fetched once instead of once per request.
+
+- `d365_layers` accepts `componentType: OptionSet`: it resolves the global option set through `GlobalOptionSetDefinitions(Name='…')` → `MetadataId`, then queries the layer table with `msdyn_solutioncomponentname = 'OptionSet'`. Local option sets live with their column, so those are still inspected via `componentType: Attribute` plus `entity`;
+- Layer rows now label the unmanaged layer as `Active (unmanaged)` and each environment ends with a sentence saying whether its top layer is unmanaged or whether the environment has no unmanaged layer at all; an Active layer's timestamp reads "not recorded" (`msdyn_overwritetime` is always `1900-01-01` for it, which previously rendered as a fake date);
+- `d365_metadata` grew a `name` parameter for `option_sets`: one keyed request instead of pulling all 987 definitions, with 404 reported as "this environment has no global option set named X";
+- Passing `filter` to `option_sets` is rejected up front (`filter-unsupported`) instead of surfacing the raw `$filter is not supported` failure — the endpoint answers HTTP 405;
+- Token acquisition is single-flight: concurrent requests to the same environment now share one token request (measured: 8 parallel calls used to make 8 OAuth requests, now 1), and the refresh skew is 2 minutes instead of 1;
+- The `d365_layers` description now lists all eleven supported component types, so a wrong `componentType` no longer needs a failed call to discover.
+
 ## 0.26.0
 
 Solution layers are now writable, in exactly one way: remove the unmanaged layer.

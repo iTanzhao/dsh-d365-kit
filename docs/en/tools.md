@@ -66,6 +66,7 @@ Queries metadata by category. 19 resource types:
 | --- | --- | --- | --- |
 | `resource` | enum (list above) | Required | Which category to query |
 | `entity` | string | — | Entity logical name, used by attributes / keys / relationships / forms / views / workflows etc. |
+| `name` | string | — | Fetch one record by exact name (currently `option_sets` only: a keyed read, one request for one global option set instead of pulling all 900+ definitions) |
 | `filter` | string | — | Extra OData `$filter`, without `$filter=`, e.g. `contains(name,'Approval')` |
 | `select` | string | — | Extra columns to return, comma-separated; an invalid column name falls back and retries automatically |
 | `orderby` | string | — | Overrides the default sort, e.g. `modifiedon desc` |
@@ -84,6 +85,8 @@ A few real constraints:
 - Display names are multilingual, so compare across environments by **logical name**, not display name;
 - Entity set names can be customized; do not hard-code the plural form — use the `entities` resource or `d365_data`'s automatic resolution;
 - `workflows` / `business_rules` return the **definition row only** by default (`type eq 1`): Dataverse stores a second, same-named activation row (`type eq 2`, different `workflowid`) for every process, which otherwise looks like a duplicate and doubles the count. An explicit `filter` (e.g. `type eq 2`) replaces the default instead of ANDing with it, so it never collapses to an empty result.
+- `option_sets` (`GlobalOptionSetDefinitions`) **do not accept** `$filter` (the service answers HTTP 405: `The query parameter $filter is not supported`), so `filter` is rejected up front with a hint to use `name` instead. A lookup by name is a keyed read; when nothing matches it returns 404, and the tool reports "this environment has no global option set named X" rather than an empty table.
+- To see all 987 definitions at once, or to read the option values: query without `filter`/`name`, or use the cast path (`GlobalOptionSetDefinitions(<id>)/Microsoft.Dynamics.CRM.OptionSetMetadata?$select=Options`), which the tool does not wrap yet.
 
 ---
 
@@ -95,8 +98,8 @@ Queries `msdyn_componentlayer`: which solutions have overridden a component, the
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| `component` | string | Component name or GUID. Entities use the logical name; other types use the name / unique name of that record type |
-| `componentType` | enum | `Entity`, `Attribute`, `SystemForm`, `SavedQuery`, `Workflow`, `WebResource`, `PluginAssembly`, `PluginType`, `SdkMessageProcessingStep`, `CustomAPI` |
+| `component` | string | Component name or GUID. Entities use the logical name; other types use the name / unique name of that record type; `OptionSet` uses the global option set name |
+| `componentType` | enum | `Entity`, `Attribute`, `SystemForm`, `SavedQuery`, `Workflow`, `WebResource`, `PluginAssembly`, `PluginType`, `SdkMessageProcessingStep`, `CustomAPI`, `OptionSet` |
 | `entity` | string | Required when `componentType=Attribute` |
 | `solution` | string | Look only at one solution's layers (filtered within the results) |
 | `includeJson` | boolean | Also fetch `msdyn_componentjson` (full definition, potentially large, written to a file) |
@@ -107,9 +110,14 @@ Queries `msdyn_componentlayer`: which solutions have overridden a component, the
 { "component": "account", "componentType": "Entity", "allEnvironments": true }
 { "componentType": "Attribute", "component": "name", "entity": "account" }
 { "componentType": "SystemForm", "component": "Account" }
+{ "componentType": "OptionSet", "component": "contoso_taxcategoryos", "allEnvironments": true }
 ```
 
 Rows are returned in ascending `msdyn_order`; the last layer is the one currently in effect; `(system layer)` means the layer does not come from any solution.
+
+`Active` is the pseudo solution name Dataverse uses for an **unmanaged customization layer**: when present it always sits on top, covering the managed layers below, and it is the only layer `d365_write plan-remove-layer` can delete. The output therefore labels it `Active (unmanaged)` and states explicitly whether the top layer is unmanaged or whether "this environment has no unmanaged layer" — the latter means the component is fully driven by solutions here. An Active layer's `msdyn_overwritetime` is always `1900-01-01` (the service does not record it), so the timestamp is shown as "not recorded" instead of a fake date.
+
+`OptionSet` resolves **global** option sets only (via `GlobalOptionSetDefinitions(Name='…')` to get the `MetadataId`); local option sets live with their column, so use `componentType=Attribute` plus `entity` to inspect a column's layers. Option sets support reading layers only — removing their layer is not exposed yet (see `plan-remove-layer`).
 
 In a multi-environment query, an environment that lacks the component (name not found) only reports "this environment does not have this component"; the other environments still return their layers and take part in the comparison. The call only fails when every environment lacks it.
 
