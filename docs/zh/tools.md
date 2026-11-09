@@ -7,8 +7,31 @@
 约定：
 
 - **环境参数**：`environment`（单个）、`environments`（数组）、`allEnvironments`（全部）。省略时用配置的默认环境。
-- **只读与写入**：只有 `d365_write execute`、`d365_data_write`、`d365_data_sync execute` 会改环境，且必须人在确认卡片上批准。
+- **只读与写入**：只有 `d365_write execute`、`d365_data_write`、`d365_data_sync execute`、`d365_invoke`（POST）会改环境，且必须人在确认卡片上批准。
 - **产物**：`<工作区>/.d365/`。返回里给的是**绝对路径**，可直接用文件工具打开。
+
+## 按问题查
+
+| 你手上是这个问题 | 用这个 | 不要用 |
+| --- | --- | --- |
+| 这个环境里到底有什么、版本多少 | `d365_envs`（`check` 真连） | 直接猜 URL |
+| 这张表有哪些字段、某个字段的类型/默认值 | `d365_metadata resource=attributes`（派生列先用 `cast`） | `d365_data` |
+| 这个字段为什么在表单上没有 / 改了不生效 | `d365_refs kind=field`（谁在用）+ `d365_layers`（谁覆盖） | 只看 `attributes` |
+| 两个环境差在哪 | `d365_sync` 两边各拉一份 → `d365_diff` | 两边各查一遍对眼 |
+| 目标环境缺哪个程序集、类型、步骤 | `d365_contract drift`（含版本更旧、表单库、站点地图） | 翻 `plugin_steps` 5000 行 |
+| 这个表 / 这个选项集被哪些解决方案盖过 | `d365_layers` | `d365_metadata solutions` |
+| 组件在不在目标环境、导入会不会覆盖别人的层 | `d365_migrate` | `d365_diff` |
+| 把 DEV 的一批记录复制到 SIT | `d365_data_sync plan` → `execute`（保持 GUID、lookup 解析、确认卡） | `d365_data_write` 逐条手抄 |
+| 改一批已存在记录的某个字段 | `d365_data_sync plan-update` → `execute` | `d365_data_write` 一条一张卡 |
+| 改一条记录 / 新建一条 | `d365_data_write` | `d365_write` |
+| 改元数据：加字段、改显示名、加选项值、移除自定义层 | `d365_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
+| 这条记录长什么样、有多少条 | `d365_data`（`count` / `group` / `sample` / `query`） | `d365_metadata` |
+| 插件报错了，为什么 | `d365_trace summary` → `get`；先 `d365_health` 排除异步作业 | 猜错误码 |
+| 这条消息现在返回什么 | `d365_invoke`（GET 走 data.read，POST 走 message.invoke 且每次确认） | Postman 手拼 |
+| 这个 MR 会不会跑不起来 | `d365_code_check` | 肉眼看 diff |
+| 产物太大，对话里看不全 | `d365_reports action=view`（`match` 找一条 GUID） | 让文件工具全量读 |
+
+不传条件时 `d365_data_sync` 按整表预演并提示；`d365_data` 的 `sample` 最多 100 行、`group` 最多 500 组，要更多用 `query` 配 `top`。
 
 ---
 

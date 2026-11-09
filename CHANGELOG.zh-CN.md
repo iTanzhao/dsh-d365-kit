@@ -4,6 +4,14 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.33.2
+
+文档：工具参考与排查 skill 的开头各加一张「按问题查」的路由表。
+
+- **`docs/zh/tools.md` / `docs/en/tools.md` 开头新增路由表**——16 个问题、对应工具，以及「容易误用成什么」（改一批记录该用 `d365_data_sync plan-update` 而不是 `d365_data_write`；「这个字段为什么不在表单上」该用 `d365_refs` + `d365_layers` 而不是只看 `attributes`；「两个环境差在哪」该用 `d365_sync` + `d365_diff` 而不是两边各查一遍对眼）；
+- **`skills/d365-troubleshooting/SKILL.md` 也带上同一张表**，排查时随 skill 一起加载，不用先查文档；
+- 「只读与写入」的约定补上 `d365_invoke`（POST）也属于会改环境、需要确认的调用。
+
 ## 0.33.1
 
 自检剩下的 medium 项——都是同一个小毛病的小一号版本：答案看着合理，但数据撑不住。

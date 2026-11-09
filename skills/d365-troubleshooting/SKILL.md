@@ -5,6 +5,26 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 
 # 排查 D365 插件失败
 
+## 先用对工具（按问题查）
+
+| 你手上是这个问题 | 用这个 | 不要用 |
+| --- | --- | --- |
+| 这个环境里到底有什么、版本多少 | `d365_envs`（`check` 真连） | 猜 URL |
+| 这张表有哪些字段、某个字段的类型/默认值 | `d365_metadata resource=attributes`（派生列先 `cast`） | `d365_data` |
+| 这个字段为什么表单上没有 / 改了不生效 | `d365_refs kind=field` + `d365_layers` | 只看 `attributes` |
+| 两个环境差在哪 | `d365_sync` 两边 → `d365_diff` | 两边各查一遍对眼 |
+| 目标环境缺哪个程序集/类型/步骤 | `d365_contract drift` | 翻 `plugin_steps` 5000 行 |
+| 这个表/选项集被哪些解决方案盖过 | `d365_layers` | `d365_metadata solutions` |
+| 导入会不会覆盖别人的层 | `d365_migrate` | `d365_diff` |
+| 把一批记录复制到另一个环境 | `d365_data_sync plan` → `execute` | 用 `d365_data_write` 手抄 |
+| 改一批已存在记录的某个字段 | `d365_data_sync plan-update` → `execute` | `d365_data_write` 一条一张卡 |
+| 改/建一条记录 | `d365_data_write` | `d365_write` |
+| 改元数据（字段、显示名、选项值、移除自定义层） | `d365_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
+| 这条记录长什么样、有多少条 | `d365_data`（`count`/`group`/`sample`/`query`） | `d365_metadata` |
+| 插件报错，为什么 | `d365_trace summary` → `get`，先 `d365_health` 排除异步作业 | 猜错误码 |
+| 这条消息现在返回什么 | `d365_invoke` | Postman 手拼 |
+| 产物太大看不全 | `d365_reports action=view`（`match` 找 GUID） | 全量读文件 |
+
 ## 什么时候用
 
 插件抛异常、自定义消息返回 400/500、某个表上的同步逻辑突然不动、异步作业积压——任何「元数据看起来对，但运行时不对」的问题。目标不是读一堆日志，而是**尽快拿到一个签名 + 一个可复现的调用**。

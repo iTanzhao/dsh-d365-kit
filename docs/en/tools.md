@@ -7,8 +7,31 @@
 Conventions:
 
 - **Environment parameters**: `environment` (single), `environments` (array), `allEnvironments` (all). When omitted, the configured default environment is used.
-- **Read vs. write**: only `d365_write execute`, `d365_data_write` and `d365_data_sync execute` change an environment, and each must be approved by a human on a confirmation card.
+- **Read vs. write**: only `d365_write execute`, `d365_data_write`, `d365_data_sync execute` and `d365_invoke` (POST) change an environment, and each must be approved by a human on a confirmation card.
 - **Artifacts**: `<workspace>/.d365/`. Paths are returned as **absolute paths** and can be opened directly with the file tools.
+
+## Which tool for which question
+
+| Your question | Use | Not |
+| --- | --- | --- |
+| What is in this environment, which version | `d365_envs` (with `check`) | Guessing at URLs |
+| Which columns does a table have, one column's type/default | `d365_metadata resource=attributes` (use `cast` for derived columns) | `d365_data` |
+| Why is this column missing from a form / why did my change not take effect | `d365_refs kind=field` (who uses it) + `d365_layers` (who overrides it) | `attributes` alone |
+| Where do two environments differ | `d365_sync` both, then `d365_diff` | Querying both and eyeballing |
+| Which assembly, type or step is missing in the target | `d365_contract drift` (also older versions, form libraries, sitemap) | Paging 5000 `plugin_steps` |
+| Which solutions override this table or option set | `d365_layers` | `d365_metadata solutions` |
+| Will importing this solution overwrite someone else's layer | `d365_migrate` | `d365_diff` |
+| Copy a batch of records from DEV to SIT | `d365_data_sync plan` → `execute` (keeps GUIDs, resolves lookups, confirmation card) | Hand-copying with `d365_data_write` |
+| Change one field on many existing records | `d365_data_sync plan-update` → `execute` | `d365_data_write` (one card per record) |
+| Change or create a single record | `d365_data_write` | `d365_write` |
+| Change metadata: add a column, relabel, add an option value, remove a custom layer | `d365_write` (`plan-*` is read-only, `execute` confirms) | Hand-written Web API |
+| What does this record look like, how many are there | `d365_data` (`count` / `group` / `sample` / `query`) | `d365_metadata` |
+| A plug-in failed — why | `d365_trace summary` → `get`; run `d365_health` first to rule out async jobs | Guessing the error code |
+| What does this message return right now | `d365_invoke` (GET uses data.read, POST uses message.invoke and confirms every time) | Assembling it in Postman |
+| Will this MR run in the target environment | `d365_code_check` | Reading the diff by eye |
+| The artifact is too big for the conversation | `d365_reports action=view` (`match` to find one GUID) | Loading the whole file |
+
+Without a scope, `d365_data_sync` previews the whole table and says so; `d365_data`'s `sample` is capped at 100 rows and `group` at 500 groups — use `query` with `top` for more.
 
 ---
 

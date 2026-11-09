@@ -4,6 +4,14 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.33.2
+
+Documentation: a "which tool for which question" table at the top of the tool reference and of the troubleshooting skill.
+
+- **`docs/en/tools.md` / `docs/zh/tools.md` open with a routing table** — sixteen questions, the tool that answers each, and the one people reach for by mistake (change a field on many records → `d365_data_sync plan-update`, not `d365_data_write`; "why is this column not on the form" → `d365_refs` + `d365_layers`, not `attributes`; "what differs between two environments" → `d365_sync` + `d365_diff`, not two queries by eye);
+- **The troubleshooting skill carries the same table**, so the routing is loaded with the skill rather than looked up;
+- The read/write convention now also lists `d365_invoke` (POST) as a call that changes the environment and needs approval.
+
 ## 0.33.1
 
 The rest of the self-audit's medium findings — each one a smaller version of the same theme: a plausible answer that the data did not support.
