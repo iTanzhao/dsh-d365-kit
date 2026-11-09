@@ -56,10 +56,10 @@ Note: the secret is written **in plain text** to a local file. Do not paste it i
 
 ## d365_metadata
 
-Queries metadata by category. 19 resource types:
+Queries metadata by category. 20 resource types:
 
 `organization`, `entities`, `attributes`, `keys`, `one_to_many_relationships`, `many_to_many_relationships`,
-`forms`, `views`, `workflows`, `business_rules`, `plugin_assemblies`, `plugin_types`, `plugin_steps`,
+`forms`, `views`, `workflows`, `business_rules`, `plugin_assemblies`, `plugin_types`, `plugin_steps`, `step_images`,
 `web_resources`, `solutions`, `solution_components`, `custom_apis`, `sitemaps`, `option_sets`
 
 | Parameter | Type | Default | Description |
@@ -67,10 +67,13 @@ Queries metadata by category. 19 resource types:
 | `resource` | enum (list above) | Required | Which category to query |
 | `entity` | string | — | Entity logical name, used by attributes / keys / relationships / forms / views / workflows etc. |
 | `name` | string | — | Fetch one record by exact name (currently `option_sets` only: a keyed read, one request for one global option set instead of pulling all 900+ definitions) |
+| `attribute` | string | — | For `attributes`: read one column (keyed read). Pair with `cast` for columns that only exist on a derived type |
+| `cast` | string | — | Cast the attribute to its derived metadata type, e.g. `BooleanAttributeMetadata`, `PicklistAttributeMetadata`, `LookupAttributeMetadata`, `StringAttributeMetadata`. Only with `attribute` |
+| `expand` | string | — | Extra `$expand`, e.g. `plugintypeid($select=typename)`; `plugin_steps` already expands the plug-in type and message |
 | `filter` | string | — | Extra OData `$filter`, without `$filter=`, e.g. `contains(name,'Approval')` |
-| `select` | string | — | Extra columns to return, comma-separated; an invalid column name falls back and retries automatically |
+| `select` | string | — | Extra columns to return, comma-separated; an invalid column name falls back and retries automatically. **An explicit `select` also decides which columns the inline table shows** |
 | `orderby` | string | — | Overrides the default sort, e.g. `modifiedon desc` |
-| `top` | integer | configured `maxRecords` (200) | Maximum rows to return |
+| `top` | integer | 1000 for list resources, otherwise configured `maxRecords` (200) | Maximum rows to return |
 | `environments` | string[] | default environment | Query several environments at once, align them by name, and report cross-environment differences |
 | `allEnvironments` | boolean | false | All environments |
 | `save` | boolean | false | Force the full result into a file (by default it is written only when over 12 rows) |
@@ -87,6 +90,9 @@ A few real constraints:
 - `workflows` / `business_rules` return the **definition row only** by default (`type eq 1`): Dataverse stores a second, same-named activation row (`type eq 2`, different `workflowid`) for every process, which otherwise looks like a duplicate and doubles the count. An explicit `filter` (e.g. `type eq 2`) replaces the default instead of ANDing with it, so it never collapses to an empty result.
 - `option_sets` (`GlobalOptionSetDefinitions`) **do not accept** `$filter` (the service answers HTTP 405: `The query parameter $filter is not supported`), so `filter` is rejected up front with a hint to use `name` instead. A lookup by name is a keyed read; when nothing matches it returns 404, and the tool reports "this environment has no global option set named X" rather than an empty table.
 - To see all 987 definitions at once, or to read the option values: query without `filter`/`name`, or use the cast path (`GlobalOptionSetDefinitions(<id>)/Microsoft.Dynamics.CRM.OptionSetMetadata?$select=Options`), which the tool does not wrap yet.
+- List resources (`plugin_steps`, `plugin_types`, `step_images`, `attributes`) default to 1000 rows, not 200: a mature organization often has 5000+ `sdkmessageprocessingsteps`, and 200 rows sorted by name makes the step you want look absent. When a result is truncated the digest says "N shown / M total" (`M` from the server's `$count`, which itself caps at 5000 and is shown as ≥5000) — truncation is never silent.
+- Columns that only live on a derived type must be cast: `DefaultValue`, `OptionSet`, `Targets`, `Format` are not on the `AttributeMetadata` base type. Read one field with `{"resource":"attributes","entity":"account","attribute":"donotemail","cast":"BooleanAttributeMetadata","select":"LogicalName,DefaultValue"}`; selecting those columns without a cast returns 400.
+- `plugin_steps` expands `plugintypeid($select=typename),sdkmessageid($select=name)` by default — that is where the `plugintype` / `message` columns come from (a step's `name` is often blank, so those two are how you recognise it). Step images live in the `step_images` resource.
 
 ---
 
@@ -451,7 +457,7 @@ Environment health: "is it safe to touch this environment right now".
 { "allEnvironments": true, "hours": 24 }
 ```
 
-Per environment it reports: version, organization name, queued (Ready) jobs, suspended jobs, recent failure count (merged by job name), solutions currently importing / publishing, and recently installed solutions.
+Per environment it reports: version, organization name, queued (Ready) jobs, suspended jobs, recent failure count (merged by job name), solutions currently importing / publishing, recently installed solutions, and the **plug-in trace level** (organization `plugintracelogsetting`: off / exception only / all).
 
 Failures are `statecode 3` (Completed) **and** `statuscode 31` (Failed): the same Completed state also covers 30 Succeeded and 32 Canceled, so matching on `statecode` alone counts and lists succeeded jobs as failures.
 
@@ -465,16 +471,25 @@ Local artifacts and disk usage.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `action` | `list` \| `cleanup` \| `compact` | `list` | |
+| `action` | `list` \| `view` \| `cleanup` \| `compact` | `list` | |
+| `file` | string | — | For `view`: a path under `.d365` (`query/xxx.json`) or a bare file name |
+| `offset` | integer | 0 | For `view`: first line to show (0-based) |
+| `match` | string | — | For `view`: only lines containing this string (case-insensitive) — the practical way to find one GUID in a big JSON |
+| `wrap` | integer | 400 | For `view`: wrap lines longer than this; 0 means no wrapping |
+| `pretty` | boolean | true for `.json` | For `view`: expand JSON with indentation |
 | `target` | `snapshots` \| `reports` \| `diffs` \| `query` \| `changes` \| `all` | `all` | Scope for `cleanup` |
 | `dryRun` | boolean | **true** | Dry run only; pass `false` after confirming to actually delete |
-| `limit` | integer | 15 | How many entries `list` shows per category |
+| `limit` | integer | 15 / 60 | Entries `list` shows per category; for `view`, lines to show (max 2000) |
 
 ```json
 { "action": "cleanup", "target": "query" }
 { "action": "cleanup", "target": "query", "dryRun": false }
 { "action": "compact" }
+{ "action": "view", "file": "query/2026-11-09T04-03-33-467Z-data-count.json" }
+{ "action": "view", "file": "query/layers-uat.json", "match": "contoso_taxcategoryos", "offset": 40 }
 ```
+
+`view` reads only files under `.d365`: an absolute path pointing elsewhere is refused instead of quietly read.
 
 Cleanup touches only known subdirectories under `.d365/`, verifying each path prefix before deleting; `waivers.json`, `pending-writes/` and configuration files are never deleted.
 

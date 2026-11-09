@@ -4,6 +4,19 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.29.0
+
+This one fixes the ways the toolkit could mislead you while "looking at structure": dropped error codes, silently truncated lists, unreadable derived columns, and artifacts you could not read back.
+
+- Fixed: `D365Error` keeps the Dataverse error code and response body. `0x80048d19` used to survive only inside a Chinese one-liner, where it could neither be copied nor searched; errors now carry `errorCode` and `body`, and the message appends what that code means and what to do next (`0x80048d19` payload shape, `0x80060888` unsupported property or query parameter, `0x80040333` duplicate detection, `0x80044150` concurrency conflict, and so on);
+- `d365_metadata` gains a `step_images` resource (plug-in step registration images: image type, alias, attributes) and `plugin_steps` now expands the plug-in type and message name by default — a step's `name` is often blank, so the digest could not tell you which step it was;
+- List resources (`plugin_steps`, `plugin_types`, `step_images`, `attributes`) default to 1000 rows instead of 200. A mature organization has 5000+ `sdkmessageprocessingsteps` in practice; 200 rows sorted by name makes the step you want look absent;
+- A truncated result now reads "N shown / M total" (`M` from the server's `$count`, which itself caps at 5000 and is shown as ≥5000) instead of a vague "there is more";
+- `d365_metadata` supports keyed attribute reads cast to a derived type (`attribute` + `cast`): `DefaultValue`, `OptionSet`, `Targets` are not on the `AttributeMetadata` base type, and selecting them used to return 400;
+- An explicit `select` now also decides which columns the digest table shows (it used to always render the resource's default columns, hiding the `DefaultValue` you asked for);
+- `d365_health` adds a plug-in trace column (organization `plugintracelogsetting`: off / exception only / all). The most common reason a trace is missing is that it is off, and that was previously invisible;
+- `d365_reports` gains `action=view`: read an artifact back through a line window, with `match` filtering, `offset`/`limit` paging, `wrap`, and JSON indented by default; only files under `.d365` are readable, and an absolute path pointing elsewhere is refused. Before this, a 500 KB result was "a file name and a size", which is the same as not saved.
+
 ## 0.28.1
 
 Migrations bind lookups by their real navigation property name, and the settings page follows the DSH language again.

@@ -56,10 +56,10 @@
 
 ## d365_metadata
 
-按类别查元数据。19 类资源：
+按类别查元数据。20 类资源：
 
 `organization`、`entities`、`attributes`、`keys`、`one_to_many_relationships`、`many_to_many_relationships`、
-`forms`、`views`、`workflows`、`business_rules`、`plugin_assemblies`、`plugin_types`、`plugin_steps`、
+`forms`、`views`、`workflows`、`business_rules`、`plugin_assemblies`、`plugin_types`、`plugin_steps`、`step_images`、
 `web_resources`、`solutions`、`solution_components`、`custom_apis`、`sitemaps`、`option_sets`
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -67,10 +67,13 @@
 | `resource` | enum（上表） | 必填 | 查哪一类 |
 | `entity` | string | — | 实体逻辑名，用于 attributes / keys / relationships / forms / views / workflows 等 |
 | `name` | string | — | 按名称精确取一条（目前只有 `option_sets`：走 keyed read，一次请求取一个全局选项集，不用把 900 多个定义全拉下来） |
+| `attribute` | string | — | `attributes` 资源只取一个字段（主键读取）。配合 `cast` 读派生类型才有的列 |
+| `cast` | string | — | 把字段 cast 到派生元数据类型，如 `BooleanAttributeMetadata`、`PicklistAttributeMetadata`、`LookupAttributeMetadata`、`StringAttributeMetadata`。只和 `attribute` 一起用 |
+| `expand` | string | — | 额外的 `$expand`，如 `plugintypeid($select=typename)`；`plugin_steps` 默认已展开插件类型与消息名 |
 | `filter` | string | — | 额外的 OData `$filter`，不带 `$filter=`，如 `contains(name,'审批')` |
-| `select` | string | — | 额外返回的列，逗号分隔；列名写错会自动降级重试 |
+| `select` | string | — | 额外返回的列，逗号分隔；列名写错会自动降级重试。**显式 select 会决定摘要表格显示哪些列** |
 | `orderby` | string | — | 覆盖默认排序，如 `modifiedon desc` |
-| `top` | integer | 配置 `maxRecords`（200） | 最多返回多少行 |
+| `top` | integer | 清单型资源 1000，其它配置 `maxRecords`（200） | 最多返回多少行 |
 | `environments` | string[] | 默认环境 | 一次查多个环境并按名称对齐、给出跨环境差异 |
 | `allEnvironments` | boolean | false | 全部环境 |
 | `save` | boolean | false | 强制把完整结果写入文件（默认超过 12 行才写） |
@@ -87,6 +90,9 @@
 - `workflows` / `business_rules` 默认只取**定义行**（`type eq 1`）：Dataverse 给每个流程另存一条同名、不同 `workflowid` 的激活行（`type eq 2`），不过滤会看起来像重复、计数也会翻倍；显式传 `filter`（如 `type eq 2`）时默认过滤自动让位，不会 AND 成空集。
 - `option_sets`（`GlobalOptionSetDefinitions`）**不接受** `$filter`（服务端直接返回 HTTP 405：`The query parameter $filter is not supported`），所以 `filter` 会被当场拒绝并提示改用 `name`。按名称取是 keyed read，找不到返回 404，工具会报「该环境没有名为 X 的全局选项集定义」而不是空表。
 - 要一次看全部 987 个定义、或要选项值时：全量用不带 `filter`/`name` 的查询；单个定义的选项值目前要用 cast 路径（`GlobalOptionSetDefinitions(<id>)/Microsoft.Dynamics.CRM.OptionSetMetadata?$select=Options`），工具暂未封装。
+- 清单型资源（`plugin_steps`、`plugin_types`、`step_images`、`attributes`）默认上限是 1000，不是 200：成熟组织的 `sdkmessageprocessingsteps` 常在 5000 条以上，200 行 + 按名称排序会让要找的步骤「看起来不存在」。结果被截断时摘要会写「已列 N 条 / 共 M 条（M 为服务端 `$count`，上限 5000 显示为 ≥5000）」，不是静默截断。
+- 派生类型才有的列要先 cast：`DefaultValue`、`OptionSet`、`Targets`、`Format` 这些不在 `AttributeMetadata` 基类型上。单字段读取用 `{"resource":"attributes","entity":"account","attribute":"donotemail","cast":"BooleanAttributeMetadata","select":"LogicalName,DefaultValue"}`；不带 cast 却 select 这些列会得到 400。
+- `plugin_steps` 默认 `$expand=plugintypeid($select=typename),sdkmessageid($select=name)`，摘要里的 `plugintype` / `message` 列就是这么来的（步骤的 `name` 经常是空的，靠这两列才认得出是哪一步）；要镜像（Step Image）用 `step_images` 资源。
 
 ---
 
@@ -451,7 +457,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 { "allEnvironments": true, "hours": 24 }
 ```
 
-每环境给出：版本、组织名、排队中（Ready）、挂起作业数（Suspended）、近期失败数（按作业名合并）、正在导入/发布的解决方案、最近安装的解决方案。
+每环境给出：版本、组织名、排队中（Ready）、挂起作业数（Suspended）、近期失败数（按作业名合并）、正在导入/发布的解决方案、最近安装的解决方案、**插件跟踪级别**（组织 `plugintracelogsetting`：关闭 / 仅异常 / 全部）。
 
 失败判定用的是 `statecode 3`（Completed）**且** `statuscode 31`（Failed）：同一个 Completed 下还有 30 Succeeded、32 Canceled，只看 `statecode` 会把成功的作业算成失败，也会把成功的作业列进失败清单。
 
@@ -465,16 +471,25 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `action` | `list` \| `cleanup` \| `compact` | `list` | |
+| `action` | `list` \| `view` \| `cleanup` \| `compact` | `list` | |
+| `file` | string | — | `view` 的文件：`.d365` 下的相对路径（`query/xxx.json`）或文件名 |
+| `offset` | integer | 0 | `view` 从第几行开始（0 基） |
+| `match` | string | — | `view` 只显示包含该字符串的行（不区分大小写），在大 JSON 里找一条 GUID 用这个 |
+| `wrap` | integer | 400 | `view` 每行超过多少字符折行，0 表示不折行 |
+| `pretty` | boolean | `.json` 为 true | `view` 是否把 JSON 缩进展开 |
 | `target` | `snapshots` \| `reports` \| `diffs` \| `query` \| `changes` \| `all` | `all` | `cleanup` 的范围 |
 | `dryRun` | boolean | **true** | 只预演；确认后传 `false` 才删 |
-| `limit` | integer | 15 | `list` 每类列多少条 |
+| `limit` | integer | 15 / 60 | `list` 每类列多少条；`view` 最多显示多少行（上限 2000） |
 
 ```json
 { "action": "cleanup", "target": "query" }
 { "action": "cleanup", "target": "query", "dryRun": false }
 { "action": "compact" }
+{ "action": "view", "file": "query/2026-11-09T04-03-33-467Z-data-count.json" }
+{ "action": "view", "file": "query/layers-uat.json", "match": "contoso_taxcategoryos", "offset": 40 }
 ```
+
+`view` 只读 `.d365` 目录内的文件：绝对路径越界会被拒绝，而不是悄悄去读别的文件。大 JSON 默认缩进展开，配 `match` 找一条 GUID 比翻行号快。
 
 清理只碰 `.d365/` 下的已知子目录，删前逐个校验路径前缀；`waivers.json`、`pending-writes/`、配置文件永不被删。
 

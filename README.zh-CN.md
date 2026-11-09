@@ -107,10 +107,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.28.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.29.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.28.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.29.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
