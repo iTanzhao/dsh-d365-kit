@@ -7,7 +7,7 @@
 一个 DSH bundle，两部分：
 
 ```
-index.js      # Host 侧：注册 16 个工具、挂设置页的 HTTP 路由
+index.js      # Host 侧：注册 18 个工具、挂设置页的 HTTP 路由
 client.js     # Web 侧：设置页（六个标签，无构建步骤，直接是浏览器模块）
 lib/*.js      # Host 侧全部逻辑（41 个模块）
 ```
@@ -44,7 +44,7 @@ lib/
   waivers.js          契约豁免
   contract-history.js 漂移趋势
   data-migrate.js     业务记录跨环境迁移（计划、lookup 解析、写入、run 记录）
-  tool-*.js           16 个工具，一个文件一个工具（或一组相关的）
+  tool-*.js           18 个工具，一个文件一个工具（或一组相关的）
 ```
 
 ## 数据流

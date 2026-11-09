@@ -2,7 +2,7 @@
 
 **[English](../en/tools.md)** | 简体中文
 
-16 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
+18 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
 
 约定：
 
@@ -223,21 +223,28 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `action` | `count` \| `group` \| `sample` | 必填 |
+| `action` | `count` \| `group` \| `sample` \| `query` | 必填 |
 | `entity` | string | 必填。逻辑名或集合名（`contoso_systemconfiguration` / `contoso_systemconfigurations`） |
 | `filter` | string | OData `$filter`，不带 `$filter=` |
 | `field` | string | `group` 必填：按哪列分组 |
-| `select` | string | `sample` 返回的列，逗号分隔 |
-| `top` | integer | `sample` 行数（默认 5，最多 100）；`group` 返回前 N 组（默认 20） |
+| `select` | string | `sample` / `query` 返回的列，逗号分隔；`query` 省略则取行本身带的列 |
+| `orderby` | string | `query` 的排序，例如 `modifiedon desc` |
+| `expand` | string | `query` 的 `$expand`，例如 `primarycontactid($select=fullname)` |
+| `id` | string | `query`：按主键取一条（GUID，或带引号的备用键值如 `'contoso_001'`） |
+| `top` | integer | `sample` 行数（默认 5，最多 100）；`group` 返回前 N 组（默认 20）；`query` 返回行数（默认 25，最多 500） |
 | `environment` / `environments` / `allEnvironments` | | 环境选择 |
 
 ```json
 { "action": "count", "entity": "contoso_systemconfiguration", "filter": "statecode eq 0" }
 { "action": "group", "entity": "account", "field": "contoso_customertier" }
 { "action": "sample", "entity": "account", "select": "name,contoso_customertier", "top": 5 }
+{ "action": "query", "entity": "account", "select": "name,createdon", "orderby": "createdon desc", "top": 3 }
+{ "action": "query", "entity": "accounts", "id": "11111111-1111-1111-1111-111111111111" }
 ```
 
 计数优先 `$apply=aggregate($count as count)`（不受 `$count=true` 的 5000 上限影响），失败退 `$count=true`；空分组显示「（空）」。
+
+`query` 的标题会区分三种情况：`共 N 行`、`已列 N 条 / 共 M 条（未列全…）`、`返回 N 行（可能还有更多）`。**跨环境复制的 GUID 在目标环境不存在时是 404**，`id` 分支会明确报 `record-not-found`，而不是给一张空表。
 
 用途：改选项集、删字段、收窄筛选条件之前，先知道「这个值还有多少条记录在用」。
 
@@ -492,6 +499,60 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 `view` 只读 `.d365` 目录内的文件：绝对路径越界会被拒绝，而不是悄悄去读别的文件。大 JSON 默认缩进展开，配 `match` 找一条 GUID 比翻行号快。
 
 清理只碰 `.d365/` 下的已知子目录，删前逐个校验路径前缀；`waivers.json`、`pending-writes/`、配置文件永不被删。
+
+---
+
+## d365_invoke
+
+调一条 Dataverse 消息（action 或 function），返回 HTTP 状态与响应体——用来复现一次失败，或看某条消息到底返回什么。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `message` | string | — | 必填，消息名，例如 `WinOpportunity`、`contoso_DoSomething` |
+| `method` | `POST` \| `GET` | `POST` | `POST`=action（可带请求体）；`GET`=function（参数按 OData 别名拼进 URL，不能绑定记录） |
+| `entity` | string | — | 绑定 action 时必填：记录的实体集名（如 `accounts`） |
+| `id` | string | — | 绑定 action 时必填：记录主键 GUID |
+| `parameters` | object | — | `POST` 为请求体（action 的输入参数）；`GET` 为 function 的命名参数（值会按 OData 字面量格式化） |
+| `environment` | string | 默认环境 | |
+| `rationale` | string | — | 为什么要调这条消息，会写进产物与执行记录 |
+
+```json
+{ "message": "RetrieveTotalRecordCount", "method": "GET", "parameters": { "EntityNames": ["account"] } }
+{ "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
+```
+
+**权限按方法分**：`GET` function 是读，走「读取业务数据」（`data.read`）；`POST` action 走「调用消息」（`message.invoke`，默认关闭）。POST 每次都在对话里弹确认卡，写明环境、路径、请求体；**调用失败不抛异常**，而是把 HTTP 状态、错误码和响应体原样返回——那正是复现问题时最需要的部分。
+
+---
+
+## d365_trace
+
+读插件跟踪日志：谁跑了、跑了多久、为什么抛。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `list` \| `get` \| `summary` | `list` | |
+| `traceId` | string | — | `get` 必填：`plugintracelogid`（通常来自 `list` 输出） |
+| `hours` | number | 24 | 回看小时数 |
+| `entity` | string | — | 只看某张表上的跟踪（`primaryentity`，如 `account`） |
+| `typename` | string | — | 只看某个插件类型的跟踪；支持 contains，例如 `ContactSearch` |
+| `message` | string | — | 只看某个消息的跟踪（`messagename`，如 `Create`） |
+| `exceptionOnly` | boolean | **true** | 默认只看抛了异常的跟踪；传 `false` 连成功执行一起看 |
+| `includeConfig` | boolean | false | `get`：是否返回 `configuration` / `secureconfiguration` / `profile`（默认 false，这些字段可能含明文密钥） |
+| `top` | integer | 20 | `list` 返回行数（最多 200）；`summary` 分析的样本上限（默认 300，最多 500） |
+| `environment` / `environments` / `allEnvironments` | | 环境选择 |
+
+```json
+{ "action": "summary", "environment": "sit", "hours": 168 }
+{ "action": "list", "entity": "contact", "message": "Create", "hours": 48 }
+{ "action": "get", "traceId": "44444444-4444-4444-4444-444444444444" }
+```
+
+三件事值得知道：
+
+1. **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也当失败列出来，所以「只看失败」实际是 `ne null` 且 `ne ''`。
+2. `summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
+3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），工具在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
 
 ---
 

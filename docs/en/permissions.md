@@ -47,7 +47,8 @@ Configured in `d365.config.json`:
 | `attribute.delete` | `DELETE` field URL | Field | **Permanently delete** the field and its data (high risk) |
 | `entity.update` | `PUT` entity URL (`MSCRM.MergeLabels`) | Table | Change table display name and description |
 | `view.columns` | `PATCH savedqueries(id)` | View | Add or remove columns in system views (`layoutxml` only) |
-| `layer.remove` | `RemoveActiveCustomizations` | Layer | **Permanently remove** the top-most unmanaged layer of a component (high risk; tables and fields only) |
+| `layer.remove` | `RemoveActiveCustomizations` | Layer | **Permanently remove** the top-most unmanaged layer of a component (high risk; tables, fields, global option sets, forms, views, workflows, web resources, plug-ins, custom APIs) |
+| `message.invoke` | any `POST` action | Message | Call one Dataverse message. The message is implemented by the target environment's plug-ins, so it may write data, send notifications or call external systems (high risk; every call is confirmed in the chat) |
 
 Tick them per environment under Permissions in the settings page; "Copy to all environments" is supported.
 
@@ -57,7 +58,7 @@ The decision lives in one place, `lib/client.js`, so a new tool cannot bypass it
 
 - **Metadata read**: the entity set name in the request URL is on the metadata allowlist (`EntityDefinitions`, `systemforms`, `savedqueries`, `webresourceset`, `solutions`, `msdyn_componentlayers`…) and requires `metadata.read`; it fails with `metadata-read-forbidden`;
 - **Business-data read**: every other `GET` is blocked as business data and requires `data.read`; it fails with `data-read-forbidden`;
-- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`.
+- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`. A `d365_invoke` `POST` goes through `message.invoke` instead (failing as `message-invoke-forbidden`), while its `GET` function is still a read and needs `data.read`.
 
 Every gate fires **before a token is acquired**, so the request never reaches the environment. Decisions are cached per environment for 2 seconds, so a change in the settings page applies to the next tool call.
 

@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.30.0
+
+This release is about "looking at the scene": read one record, call one message, read the plug-in trace log.
+
+- New tool `d365_trace` (reads the plug-in trace log): `list` shows recent failures, `get` prints one trace's full exception and message block, and `summary` groups by plug-in type + message + entity + the first line of the exception — three hundred failures usually collapse to a handful of signatures, and the same signature means the same bug recurring. Failures only by default; this also fixed a real problem: **a successful trace stores an empty string, not null**, so filtering on `exceptiondetails ne null` alone listed clean runs as failures (measured on sit over 168 hours: 300 records / 25 signatures collapsed to 104 / 7);
+- `d365_trace` masks the credentials plug-ins write into the message block (`ClientSecret` inside `secureConfig`, `Authorization: Bearer …`), showing `***` in both the output and the artifact and saying how many values it masked. Traces count as business data and need "Read business data";
+- New tool `d365_invoke` (calls one action / function): returns the HTTP status and response body, and **a failed call does not throw** — it hands back the status, Dataverse error code and body verbatim, which is the useful part when reproducing a problem. The capability follows the method: a `GET` function needs "Read business data", a `POST` action needs "Call messages" (`message.invoke`, off by default, confirmed in the chat every time);
+- `d365_data` gains `action=query`: your own columns, sort, `$expand`, and one record by primary key (quoted alternate keys included), with headings that distinguish "all N rows", "N of M shown" and "there may be more". Before this it was count/group/sample only, so looking at specific rows meant hand-writing OData outside the tool.
+
 ## 0.29.0
 
 This one fixes the ways the toolkit could mislead you while "looking at structure": dropped error codes, silently truncated lists, unreadable derived columns, and artifacts you could not read back.

@@ -15,6 +15,8 @@
  *   d365_data       count / group / sample business records (needs `data.read`)
  *   d365_data_write create or patch one business record (needs `data.write`)
  *   d365_data_sync  move business records between environments (plan, then confirm)
+ *   d365_invoke     call one action or function and return status + body (needs `message.invoke`)
+ *   d365_trace      read plug-in trace logs to explain a failure (needs `data.read`)
  *   d365_contract   compare plugin registration / option values across environments
  *   d365_health     stuck jobs, running imports, recently installed solutions
  *   d365_reports    what this plugin wrote to disk, and how much space it takes
@@ -46,9 +48,11 @@ import { register as registerContract } from './lib/tool-contract.js'
 import { register as registerHealth } from './lib/tool-health.js'
 import { register as registerReports } from './lib/tool-reports.js'
 import { register as registerDataSync } from './lib/tool-data-sync.js'
+import { register as registerInvoke } from './lib/tool-invoke.js'
+import { register as registerTrace } from './lib/tool-trace.js'
 import { registerRoutes } from './lib/settings-http.js'
-import { setDataReadResolver, setDataWriteResolver, setMetadataReadResolver } from './lib/client.js'
-import { makeDataReadResolver, makeDataWriteResolver, makeMetadataReadResolver } from './lib/data-policy.js'
+import { setCapabilityResolver, setDataReadResolver, setDataWriteResolver, setMetadataReadResolver } from './lib/client.js'
+import { makeAnyCapabilityResolver, makeDataReadResolver, makeDataWriteResolver, makeMetadataReadResolver } from './lib/data-policy.js'
 
 export const name = 'dsh-d365-kit'
 
@@ -71,6 +75,7 @@ export function apply(ctx, config = {}) {
   setMetadataReadResolver(makeMetadataReadResolver(() => state.rawConfig))
   setDataReadResolver(makeDataReadResolver(() => state.rawConfig))
   setDataWriteResolver(makeDataWriteResolver(() => state.rawConfig))
+  setCapabilityResolver(makeAnyCapabilityResolver(() => state.rawConfig))
 
   const disposers = [
     registerEnvironments(ctx, state),
@@ -86,6 +91,8 @@ export function apply(ctx, config = {}) {
     registerData(ctx, state),
     registerDataWrite(ctx, state),
     registerDataSync(ctx, state),
+    registerInvoke(ctx, state),
+    registerTrace(ctx, state),
     registerContract(ctx, state),
     registerHealth(ctx, state),
     registerReports(ctx, state),

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-16 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+18 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
 
 Conventions:
 
@@ -223,21 +223,28 @@ Reads business records. **Off by default**: unless "Read business data" (`data.r
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| `action` | `count` \| `group` \| `sample` | Required |
+| `action` | `count` \| `group` \| `sample` \| `query` | Required |
 | `entity` | string | Required. Logical name or set name (`contoso_systemconfiguration` / `contoso_systemconfigurations`) |
 | `filter` | string | OData `$filter`, without `$filter=` |
 | `field` | string | Required for `group`: which column to group by |
-| `select` | string | Columns returned by `sample`, comma-separated |
-| `top` | integer | `sample` row count (default 5, max 100); `group` returns the first N groups (default 20) |
+| `select` | string | Columns returned by `sample` / `query`, comma-separated; `query` without it returns whatever columns the rows carry |
+| `orderby` | string | `query` sort, e.g. `modifiedon desc` |
+| `expand` | string | `query` `$expand`, e.g. `primarycontactid($select=fullname)` |
+| `id` | string | `query`: one record by primary key (GUID, or a quoted alternate key such as `'contoso_001'`) |
+| `top` | integer | `sample` rows (default 5, max 100); `group` first N groups (default 20); `query` rows (default 25, max 500) |
 | `environment` / `environments` / `allEnvironments` | | Environment selection |
 
 ```json
 { "action": "count", "entity": "contoso_systemconfiguration", "filter": "statecode eq 0" }
 { "action": "group", "entity": "account", "field": "contoso_customertier" }
 { "action": "sample", "entity": "account", "select": "name,contoso_customertier", "top": 5 }
+{ "action": "query", "entity": "account", "select": "name,createdon", "orderby": "createdon desc", "top": 3 }
+{ "action": "query", "entity": "accounts", "id": "11111111-1111-1111-1111-111111111111" }
 ```
 
 Counting prefers `$apply=aggregate($count as count)` (unaffected by the 5,000 cap of `$count=true`), falling back to `$count=true`; empty groups display as "(empty)".
+
+`query` distinguishes three outcomes in its heading: `共 N 行` (all N rows), `已列 N 条 / 共 M 条` (N of M shown), or `返回 N 行（可能还有更多）` (there may be more). **A GUID copied from another environment is a 404 when it is absent here**, and the `id` path reports `record-not-found` instead of handing back an empty table.
 
 Use it to learn "how many records still use this value" before changing an option set, deleting a field, or narrowing a filter.
 
@@ -492,6 +499,60 @@ Local artifacts and disk usage.
 `view` reads only files under `.d365`: an absolute path pointing elsewhere is refused instead of quietly read.
 
 Cleanup touches only known subdirectories under `.d365/`, verifying each path prefix before deleting; `waivers.json`, `pending-writes/` and configuration files are never deleted.
+
+---
+
+## d365_invoke
+
+Calls one Dataverse message (action or function) and returns the HTTP status and response body — to reproduce a failure, or to see what a message actually returns.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `message` | string | — | Required. Message name, e.g. `WinOpportunity`, `contoso_DoSomething` |
+| `method` | `POST` \| `GET` | `POST` | `POST`=action (may carry a body); `GET`=function (parameters go into the URL as OData aliases, cannot bind a record) |
+| `entity` | string | — | Required for a bound action: the record's entity set (`accounts`) |
+| `id` | string | — | Required for a bound action: the record's primary key GUID |
+| `parameters` | object | — | `POST`: the request body (action inputs); `GET`: named function parameters (values are formatted as OData literals) |
+| `environment` | string | default environment | |
+| `rationale` | string | — | Why this message is being called; written to the artifact and the run record |
+
+```json
+{ "message": "RetrieveTotalRecordCount", "method": "GET", "parameters": { "EntityNames": ["account"] } }
+{ "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
+```
+
+**The capability follows the method**: a `GET` function is a read and needs "Read business data" (`data.read`); a `POST` action needs "Call messages" (`message.invoke`, off by default). Every POST asks for confirmation in the chat with the environment, path and body. **A failed call does not throw** — it returns the HTTP status, Dataverse error code and response body verbatim, which is exactly the part you need when reproducing a problem.
+
+---
+
+## d365_trace
+
+Reads plug-in trace logs: who ran, for how long, and why it threw.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `action` | `list` \| `get` \| `summary` | `list` | |
+| `traceId` | string | — | Required for `get`: the `plugintracelogid` (usually from `list`) |
+| `hours` | number | 24 | Look-back window in hours |
+| `entity` | string | — | Only traces on one table (`primaryentity`, e.g. `account`) |
+| `typename` | string | — | Only one plug-in type; contains is supported, e.g. `ContactSearch` |
+| `message` | string | — | Only one message (`messagename`, e.g. `Create`) |
+| `exceptionOnly` | boolean | **true** | Default: only traces that threw. Pass `false` to include successful runs |
+| `includeConfig` | boolean | false | `get`: also return `configuration` / `secureconfiguration` / `profile` (off by default; those fields can hold plaintext secrets) |
+| `top` | integer | 20 | `list` rows (max 200); `summary` sample size (default 300, max 500) |
+| `environment` / `environments` / `allEnvironments` | | Environment selection |
+
+```json
+{ "action": "summary", "environment": "sit", "hours": 168 }
+{ "action": "list", "entity": "contact", "message": "Create", "hours": 48 }
+{ "action": "get", "traceId": "44444444-4444-4444-4444-444444444444" }
+```
+
+Three things worth knowing:
+
+1. **A successful trace stores an empty string, not null.** Filtering on `exceptiondetails ne null` alone lists clean runs as failures, so "failures only" is `ne null` and `ne ''`.
+2. `summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
+3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). The tool masks them as `***` in both the output and the artifact and tells you how many values it masked. **Traces count as business data** and need "Read business data" (`data.read`).
 
 ---
 
