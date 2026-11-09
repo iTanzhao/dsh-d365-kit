@@ -458,6 +458,11 @@ window.__ModuleLoader__.load({
         url: env.url ?? '',
         cloud: env.cloud ?? 'public',
         tenantId: env.tenantId ?? '',
+        // Carried through the draft so a save round-trips them; the server
+        // deletes any field the request omits.
+        tenantIdEnv: env.tenantIdEnv ?? '',
+        clientIdEnv: env.clientIdEnv ?? '',
+        note: env.note ?? '',
         clientId: env.clientId ?? '',
         clientSecret: '',
         clearSecret: false,
@@ -552,6 +557,12 @@ window.__ModuleLoader__.load({
             url: row.url,
             cloud: row.cloud,
             tenantId: row.tenantId,
+            // These three are not editable here, but they are part of the row:
+            // the server treats a missing field as "delete it", so dropping them
+            // would silently strip an env-var credential source or a note.
+            tenantIdEnv: row.tenantIdEnv ?? '',
+            clientIdEnv: row.clientIdEnv ?? '',
+            note: row.note ?? '',
             clientId: row.clientId,
             clientSecret: row.clientSecret || undefined,
             clearSecret: row.clearSecret || undefined,
@@ -563,7 +574,7 @@ window.__ModuleLoader__.load({
         try {
           const response = await fetch('/api/d365-meta/config', {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: WRITE_HEADERS,
             body: JSON.stringify({ defaultEnvironment: defaultKey, environments }),
           })
           const data = await response.json().catch(() => ({}))
@@ -861,7 +872,9 @@ window.__ModuleLoader__.load({
           const payload = { environments: {}, solutionUniqueName: solution.trim() || undefined }
           for (const [envKey, values] of Object.entries(draft)) {
             const granted = Object.entries(values).filter(([, on]) => on).map(([capability]) => capability)
-            if (granted.length) payload.environments[envKey] = granted
+            // An empty array is meaningful: it is how "untick everything" is
+            // recorded. Omitting the key would fall back to the default grants.
+            payload.environments[envKey] = granted
           }
           const response = await fetch('/api/d365-meta/write/policy', {
             method: 'POST',
@@ -870,6 +883,8 @@ window.__ModuleLoader__.load({
           })
           const data = await response.json().catch(() => ({}))
           if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          // Re-read so the boxes show what was stored, not what was clicked.
+          await load()
           setMessage({ kind: 'ok', text: t('write.savedPolicy') })
         } catch (cause) {
           setMessage({ kind: 'error', text: t('write.saveFailed', { error: cause.message }) })
@@ -1419,7 +1434,9 @@ window.__ModuleLoader__.load({
           const payload = {
             url: form.url.trim(),
             defaultProject: form.defaultProject.trim(),
-            ...(form.token ? { token: form.token } : {}),
+            // A clear request must not also carry whatever is still typed in the
+            // box: the server stores a supplied token before honouring the clear.
+            ...(form.token && !extra?.clearToken ? { token: form.token } : {}),
             ...(extra ?? {}),
           }
           const response = await fetch('/api/d365-meta/settings', {

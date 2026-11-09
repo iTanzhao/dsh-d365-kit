@@ -150,6 +150,8 @@ Pulls environment metadata into a local snapshot.
   "entities": ["account", "contact", "contoso_order"] }
 ```
 
+`attributes`, `keys`, `one_to_many_relationships` and `many_to_many_relationships` are per-entity: without `entities` they are skipped and listed under "issues" (they used to build `LogicalName='undefined'` and fail).
+
 Artifact `<workspace>/.d365/snapshots/<env>/<snapshot-id>/`:
 
 ```
@@ -495,6 +497,8 @@ Failures are `statecode 3` (Completed) **and** `statuscode 31` (Failed): the sam
 
 The same "importing / publishing" determination is reused by the pre-write check.
 
+Missing job data never reads as zero: if an environment has not granted "Read business data", the queued / suspended / failed columns show `—` and the table states why. It used to be swallowed into "0 failures", which is a false all-clear exactly when you are investigating.
+
 ---
 
 ## d365_reports
@@ -577,7 +581,7 @@ Three things worth knowing:
 
 1. **A successful trace stores an empty string, not null.** Filtering on `exceptiondetails ne null` alone lists clean runs as failures, so "failures only" is `ne null` and `ne ''`.
 2. `summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
-3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). The tool masks them as `***` in both the output and the artifact and tells you how many values it masked. **Traces count as business data** and need "Read business data" (`data.read`).
+3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). All three actions — `list`, `get` and `summary` — mask them as `***` in both the output and the artifact and tell you how many values they masked. **Traces count as business data** and need "Read business data" (`data.read`).
 
 ---
 

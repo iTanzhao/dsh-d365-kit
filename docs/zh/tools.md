@@ -150,6 +150,8 @@
   "entities": ["account", "contact", "contoso_order"] }
 ```
 
+`attributes`、`keys`、`one_to_many_relationships`、`many_to_many_relationships` 是按实体取的资源：没传 `entities` 时会被跳过并在「问题」里写明（以前会拼出 `LogicalName='undefined'` 直接报错）。
+
 产物 `<工作区>/.d365/snapshots/<env>/<快照ID>/`：
 
 ```
@@ -495,6 +497,8 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 同一份「正在导入/发布」判定也被写入前的预检查复用。
 
+读不到作业数据时不报 0：如果环境没勾「读取业务数据」，排队 / 挂起 / 失败三列显示 `—`，并在表下写明原因。以前这种情况会被吞成「0 个失败」，在排查时给出假的安全结论。
+
 ---
 
 ## d365_reports
@@ -577,7 +581,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 1. **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也当失败列出来，所以「只看失败」实际是 `ne null` 且 `ne ''`。
 2. `summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
-3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），工具在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
+3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），`list` / `get` / `summary` 三个动作在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
 
 ---
 

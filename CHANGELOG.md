@@ -4,6 +4,23 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.33.0
+
+A self-audit of every module (47 under `lib/`, `index.js` and the 1.7k-line `client.js`) turned up a dozen bugs that each produced a confidently wrong answer rather than an error. This release fixes them.
+
+- **Revoking everything in the permissions page did nothing.** Saving dropped an environment whose boxes were all cleared, and a missing entry means "default grants", i.e. metadata reads back on. Empty arrays are now stored, and the page re-reads the policy after saving instead of trusting its own draft;
+- **Saving the settings page could erase an environment's credentials source.** The page has no inputs for `tenantIdEnv` / `clientIdEnv` / `note`, and the server treated every omitted field as "delete". The client now round-trips them and the server only touches fields present in the request;
+- **The environment-save endpoint had no same-origin guard.** Every other write route requires the `x-d365-meta-write` header; the one that writes URLs and client secrets did not. The page now sends it and the route checks it;
+- **The execute confirmation card printed the opposite of what would happen**: `keep GUID`, `keep created time` and `suppress duplicate detection` rendered as "no" because the card was built from the four overridable keys only, while execution merged them from the plan. It now starts from the plan's full option set;
+- **The first bulk update would PATCH every record and then fail** writing its own run file (the runs directory was created by the migration path only), so the plan was marked failed and the caller was told nothing was written. It also counts a failed back-reference PATCH as a failed row instead of hiding it, and `onMissingLookup: "fail"` finally refuses: "has an unresolved reference" used to be computed as a function of that same policy, so the guard never fired;
+- **Bulk updates accept any spelling of a column** and normalized the field list but not the values, so the preview printed `undefined` and the PATCH sent a key the plan never showed. Values are keyed by the canonical logical name;
+- **`update-attribute` / `delete-attribute` / `update-entity` ignored `solutionHint`**: the operations were built without `solutionUniqueName`, so with a default solution configured the change landed in the default layer. The view-column planner now also rejects a non-identifier column name and no longer lets `$&` in the layout be expanded by `String.replace`;
+- **`d365_data` interpolated the entity name into `$filter` unescaped** (with `odataString` imported but unused): a quote in the name got a 400 that was reported as "no such entity", and a crafted name could widen the filter. It now rejects anything outside a logical-name shape;
+- **`d365_health` reported `0 failures` when it was not allowed to look.** Every job query was `catch(() => null)` then `?? 0`, so a missing `data.read`/403 read as a clean bill of health — on the tool you run when something is wrong. The columns now show `—` with a line saying why;
+- **`d365_trace` masked credentials only in `get`**: `list` and `summary` wrote the raw `exceptiondetails` into the artifact and the transcript. All three actions mask now;
+- **`d365_sync` offered per-entity resources with no entity parameter** (`attributes`, `keys`, `*_relationships`) and built `LogicalName='undefined'`; they are skipped with a note under issues. `d365_contract` now counts expired waivers, and `handler-missing` findings are de-duplicated per environment instead of only being reported for the first one;
+- Settings/config JSON is written through a temp file whose name now carries a random suffix: two concurrent saves in one process shared `${path}.tmp-${pid}` and could rename each other's half-written bytes into place.
+
 ## 0.32.1
 
 The previous version shipped the skill but told you to copy it into `~/.dsh/skills/` by hand — installing the bundle did not put it there, which is the same as not shipping it. The plugin now registers it itself.
