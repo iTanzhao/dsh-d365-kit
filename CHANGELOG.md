@@ -4,6 +4,14 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.32.0
+
+A skill, not another tool: the toolkit could already read traces, but the ordering was nowhere written down.
+
+- Ships `skills/d365-troubleshooting/SKILL.md` — an agent skill for a plug-in failure: confirm the environment, the `data.read` grant and the trace level first; check async jobs before blaming a plug-in; collapse hundreds of failures into signatures with `d365_trace summary`; pull one full call with `get`; verify where the step is actually registered (message / stage / mode / filtering attributes); reproduce with `d365_invoke`;
+- It also carries the error-code table (`0x80048d19` payload shape, `0x80040216` missing record, `0x80040333` duplicate detection, `0x80044150` concurrency, `0x80048423` managed component, `0x8004a0f6` state transition, `0x80060888` unsupported property) and the three traps that cost real time: a successful trace stores an empty string, `$count` caps at 5000, and metadata reads versus business-data reads are two different switches;
+- Install copies it to `~/.dsh/skills/d365-troubleshooting/` (see INSTALL). It is plain Markdown, meant to be edited per environment.
+
 ## 0.31.0
 
 Bulk edits: change fields on many existing records inside one environment, with the same dry-run-then-approve shape as migration.

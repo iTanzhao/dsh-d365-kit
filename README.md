@@ -107,10 +107,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.31.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.32.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.31.0"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.32.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -258,6 +258,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 | [docs/en/permissions.md](docs/en/permissions.md) | Capability table, write flow, pre-flight check, safety boundary |
 | [docs/en/checks.md](docs/en/checks.md) | Rules and confidence levels for migration assessment, contract drift and code checks |
 | [docs/en/troubleshooting.md](docs/en/troubleshooting.md) | Common error codes and troubleshooting |
+| [skills/d365-troubleshooting/SKILL.md](skills/d365-troubleshooting/SKILL.md) | Agent skill: how to work a plug-in failure from trace to reproduction |
 | [docs/en/architecture.md](docs/en/architecture.md) | Module layout, data flow, how to add a tool |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 

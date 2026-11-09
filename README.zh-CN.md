@@ -107,10 +107,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.31.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.32.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.31.0"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.32.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -258,6 +258,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 | [docs/permissions.md](docs/zh/permissions.md) | 能力表、写入流程、预检查、安全边界 |
 | [docs/checks.md](docs/zh/checks.md) | 迁移评估、契约漂移、代码检查的规则与置信度 |
 | [docs/troubleshooting.md](docs/zh/troubleshooting.md) | 常见错误码与排查 |
+| [skills/d365-troubleshooting/SKILL.md](skills/d365-troubleshooting/SKILL.md) | Agent skill：从跟踪日志到复现调用的排查流程 |
 | [docs/architecture.md](docs/zh/architecture.md) | 模块结构、数据流、如何加一个工具 |
 | [CHANGELOG.md](CHANGELOG.zh-CN.md) | 版本记录 |
 

@@ -19,7 +19,7 @@ For the complete steps, see [docs/en/installation.md](docs/en/installation.md).
 ### Option 1: Install from npm (shortest, upgradeable)
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.31.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.32.0"
 ```
 
 This needs the package to be published to the registry pnpm uses — public npm or an internal mirror. The name has no scope, so no scope mapping is required.
@@ -29,7 +29,7 @@ This needs the package to be published to the registry pnpm uses — public npm 
 ### Option 2: Install from Git (no registry needed)
 
 ```
-plugin_manager install_bundle target="git+https://<your Git>/<group>/dsh-d365-kit.git#v0.31.0"
+plugin_manager install_bundle target="git+https://<your Git>/<group>/dsh-d365-kit.git#v0.32.0"
 ```
 
 ### Option 3: Install from a local directory
@@ -66,6 +66,17 @@ d365_metadata resource=entities top=3
 ```
 
 If both return content, you're connected. The first `d365_sync` pulls the full metadata (about 125 MB, three minutes or so); if you don't want to spend the disk space, you can skip it for now.
+
+### Optional: install the troubleshooting skill
+
+The package ships an agent skill at `skills/d365-troubleshooting/SKILL.md` (how to work a plug-in failure: trace level → signature → one full call → registration → reproduce). Copy it into your DSH home so the agent picks it up:
+
+```
+mkdir -p ~/.dsh/skills/d365-troubleshooting
+cp skills/d365-troubleshooting/SKILL.md ~/.dsh/skills/d365-troubleshooting/
+```
+
+On Windows that's `%USERPROFILE%\.dsh\skills\d365-troubleshooting\`. It is plain Markdown — edit it to match your own environments and conventions.
 
 ## Upgrade
 
