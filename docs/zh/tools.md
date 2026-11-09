@@ -289,6 +289,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 - **保持 GUID**：跟着字段走（见上）；`keepGuid: false` 时由目标分配主键，批内引用按依赖顺序重映射，创建后二次 `PATCH` 补齐（环上的引用也走这一步）。
 - **lookup 解析顺序**：先按 GUID 在目标找同一条；找不到再按主名精确匹配（命中 1 条记「按名称」，多条记「歧义」，0 条记「缺失」）。多态 lookup（`customerid` 这类）先在源环境确定它指向哪张表，不靠猜。
+- **lookup 写入按导航属性名**：`@odata.bind` 的键是关系的导航属性名，不一定是字段逻辑名（自定义关系里 `contoso_approverid` 常绑到 `contoso_ApproverId`）。预演会从 `RelationshipDefinitions` 读这张映射，报告里单列「导航属性名与逻辑名不同」的字段；读不到时退回逻辑名，并在「需要注意」里提示。旧版本生成的计划没有这份映射，`execute` 会以 `stale-plan` 拒绝，重新 `plan` 即可。
 - **冲突**：目标已存在同 GUID 时默认只报告不写；`conflict: "overwrite"` 才逐条 `PATCH`。
 - **缺失引用**：默认这些记录不写并在报告里列出；`onMissingLookup: "null"` 清空该引用，`"fail"` 让整个计划拒绝执行。
 - **写入选项**：`overriddencreatedon` 保留创建时间；默认带 `MSCRM.SuppressDuplicateDetection`；Bypass 默认开（确认卡片上会写明）。

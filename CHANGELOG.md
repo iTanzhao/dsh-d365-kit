@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.28.1
+
+Migrations bind lookups by their real navigation property name, and the settings page follows the DSH language again.
+
+- Fixed: `d365_data_sync` used to build `@odata.bind` keys from the attribute's logical name, while the Web API keys them by the relationship's **navigation property** name. Custom relationships often differ (`contoso_approverid` binds as `contoso_ApproverId`, `contoso_geographicunitid` as `contoso_GeographicUnitId`), so those fields failed every row with `0x80048d19 … An undeclared property` while the preview looked clean. Each entity now reads a logical-name → navigation-name map from `RelationshipDefinitions` and writes by that name; the plan lists the fields where the two differ, and falls back to the logical name (saying so under "notes") when the map cannot be read;
+- Fixed: plans saved by older versions carry no such map, so `execute` now rejects them with `stale-plan` and asks for a fresh `plan` instead of repeating the old failure;
+- Write requests now send `content-type: application/json; charset=utf-8`, so non-ASCII values no longer depend on the server guessing the encoding;
+- Fixed: the settings page read `ctx.get('locale')` once inside `apply`, so a locale service that arrived later was never seen and the page stayed English. It now uses `ctx.inject(['locale'])` to wait for the service and pushes language changes to already-mounted pages; the dictionaries are registered in one `register('d365-meta', DICT)` call.
+
 ## 0.28.0
 
 Removing an unmanaged layer now works for every component type, not just tables and columns.

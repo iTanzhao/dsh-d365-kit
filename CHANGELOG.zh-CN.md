@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.28.1
+
+迁移写入改用真实的导航属性名，设置页的语言也跟着 DSH 切了。
+
+- 修复：`d365_data_sync` 原来拿字段逻辑名拼 `@odata.bind`，而 Web API 认的是关系的**导航属性名**。自定义关系里两者常常不同（`contoso_approverid` 要绑 `contoso_ApproverId`、`contoso_geographicunitid` 要绑 `contoso_GeographicUnitId`），这类字段原来 100% 报 `0x80048d19 … An undeclared property`，而预演看不出来。现在每个实体先从 `RelationshipDefinitions` 读一张「逻辑名 → 导航名」映射，写请求按导航名绑定；预演会把两者不同的字段单独列出来，读不到映射时退回逻辑名并在「需要注意」里说明；
+- 修复：旧版本存下的待执行计划没有这张映射，`execute` 现在直接以 `stale-plan` 拒绝，提示重新 `plan`，不再把旧错误重复一遍；
+- 写请求的 `content-type` 补上 `charset=utf-8`，非 ASCII 值不再依赖服务端猜编码；
+- 修复：设置页原来在 `apply` 里只读一次 `ctx.get('locale')`，locale 服务晚到就永远拿不到，整页恒为英文。改成 `ctx.inject(['locale'])` 等它就绪，并用模块级订阅把语言变化推给已挂载的页面；词典也改成一次 `register('d365-meta', DICT)`。
+
 ## 0.28.0
 
 删未受管层不再只限表和字段，`d365_layers` 认识的组件类型全部支持。

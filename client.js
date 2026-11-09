@@ -295,19 +295,37 @@ window.__ModuleLoader__.load({
      */
     let activeLocale = 'en'
     let localeService = null
+    const localeListeners = new Set()
+
+    /** Re-render every mounted panel (locale service arrival or language switch). */
+    function notifyLocale() {
+      for (const listener of [...localeListeners]) {
+        try {
+          listener()
+        } catch {
+          // One crashed panel must not stop the others from re-rendering.
+        }
+      }
+    }
 
     function localeFrom(id) {
       return String(id ?? '').toLowerCase().startsWith('zh') ? 'zh' : 'en'
     }
 
+    /** Active locale id from either read entry the service exposes. */
+    function activeIdOf(locale) {
+      try {
+        const snapshot = locale?.getLocale?.() ?? locale?.getSnapshot?.()
+        return snapshot?.active
+      } catch {
+        return undefined
+      }
+    }
+
     /** Read the live locale on every call: the page must follow DSH's setting. */
     function currentLocale() {
-      try {
-        const live = localeService?.getLocale?.()?.active
-        if (live) return localeFrom(live)
-      } catch {
-        // Fall back to the last value seen at registration time.
-      }
+      const live = activeIdOf(localeService)
+      if (live) return localeFrom(live)
       return activeLocale
     }
 
@@ -317,12 +335,15 @@ window.__ModuleLoader__.load({
       return String(text).replace(/\{(\w+)\}/g, (match, name) => (params[name] ?? match))
     }
 
-    /** Re-render a panel when the locale changes. */
+    /** Re-render a panel when the locale service arrives or the language changes. */
     function useLocaleRevision() {
       const [, setRevision] = React.useState(0)
       React.useEffect(() => {
-        const unsubscribe = localeService?.subscribe?.(() => setRevision((value) => value + 1))
-        return typeof unsubscribe === 'function' ? unsubscribe : undefined
+        const listener = () => setRevision((value) => value + 1)
+        localeListeners.add(listener)
+        return () => {
+          localeListeners.delete(listener)
+        }
       }, [])
     }
 
@@ -1737,30 +1758,36 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        const locale = ctx.get('locale')
-        if (locale) {
+        // The `locale` service is provided by @deepseek-ai/dsh-client-locale,
+        // which may activate after this plugin. A one-shot `ctx.get('locale')`
+        // read would then be undefined forever and the page would stay English
+        // — the reported "settings page does not follow DSH's language" bug.
+        // `ctx.inject` waits for the service and re-runs this body if it is
+        // replaced, so the wiring is late-safe and self-healing.
+        ctx.inject(['locale'], (ctx) => {
+          const locale = ctx.locale
           localeService = locale
+          ctx.effect(() => () => {
+            if (localeService === locale) localeService = null
+          })
+
           const sync = () => {
-            try {
-              activeLocale = localeFrom(locale.getLocale?.().active)
-            } catch {
-              activeLocale = 'en'
-            }
+            const live = activeIdOf(locale)
+            if (live) activeLocale = localeFrom(live)
+            notifyLocale()
           }
           sync()
           ctx.effect(() => locale.subscribe?.(sync) ?? (() => {}))
           // Registration is a courtesy for other surfaces reading this
           // namespace; the page never depends on it succeeding.
-          for (const [id, dict] of Object.entries(DICT)) {
-            ctx.effect(() => {
-              try {
-                return locale.register('d365-meta', id, dict)
-              } catch {
-                return () => {}
-              }
-            })
-          }
-        }
+          ctx.effect(() => {
+            try {
+              return locale.register('d365-meta', DICT)
+            } catch {
+              return () => {}
+            }
+          })
+        })
 
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
