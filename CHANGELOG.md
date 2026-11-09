@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.31.0
+
+Bulk edits: change fields on many existing records inside one environment, with the same dry-run-then-approve shape as migration.
+
+- `d365_data_sync` gains `action=plan-update`: one environment, an explicit `ids` list (deduplicated, at most 1000) and a `values` map of attribute → new value. The plan reads the current values, previews **before → after** for the first rows, lists ids that do not exist, and asks you to confirm scope, fields and bypass;
+- `filter` and `fetchXml` are refused on purpose: rewriting a batch selected by query has no undo key. Resolve ids with `d365_data action=query` first, then pass them in;
+- Scalar columns only — a lookup in `values` is rejected with `lookup-unsupported`, because a lookup has to bind by navigation property name (`d365_data_write` handles that case for a single record);
+- Execution keeps the guarantees of the migration path: `plan-update` needs `data.read`, `execute` needs `data.write` and a human approval on the card, writes run at bounded concurrency with `MSCRM.BypassCustomPluginExecution` by default, and a per-id run log lands in `.d365/data-sync/runs`. It updates only, never deletes.
+
 ## 0.30.0
 
 This release is about "looking at the scene": read one record, call one message, read the plug-in trace log.

@@ -284,6 +284,7 @@ Moves business records from one environment to another. The default is **mirror*
 | `action` | What it does |
 | --- | --- |
 | `plan` | Builds a read-only plan and writes it to a file; nothing touches either org (default) |
+| `plan-update` | Builds a read-only **bulk update** plan (one environment, an explicit id list) |
 | `show` / `list` / `cancel` | Re-read / list / drop a pending plan |
 | `execute` | Shows a confirmation card, then writes |
 
@@ -309,6 +310,30 @@ Behavior and constraints:
 - **Permissions**: `plan` needs `data.read` on both ends; `execute` also needs `data.write` on the target. The plan's "permissions" block names the missing switch — without `data.write` on the target, `execute` is refused, so tick it on the settings page first.
 - **Files**: plans under `.d365/data-sync/plans`, run logs under `.d365/data-sync/runs` (source GUID → target GUID and failure reasons per row).
 - Creates and updates only, **never deletes**; audit columns (createdby/modifiedby and friends) are not copied; owner follows `ownerMode` (`map` / `keep` / `caller`).
+
+### Bulk updates (`plan-update`, one environment)
+
+Change many existing records inside one environment — no cross-environment copy. Same two-step shape: `plan-update` is a read-only dry run, `execute` asks on a card.
+
+```json
+{ "action": "plan-update", "environment": "dev", "entity": "account",
+  "ids": ["22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333"],
+  "values": { "donotemail": true }, "rationale": "stop emailing these test accounts" }
+```
+
+| Parameter | Meaning |
+| --- | --- |
+| `environment` | Which environment to change (required; a bulk update touches exactly one) |
+| `ids` | Primary keys to change, **given explicitly** (deduplicated, at most 1000) |
+| `values` | Attribute logical name → new value; scalar columns only |
+
+Behavior and constraints:
+
+- **`filter` / `fetchXml` are refused**: changing a whole batch by query has no undo key. Resolve ids with `d365_data action=query` first, then pass them in.
+- **Scalar columns only**: lookups need binding by navigation property name, so `d365_data_write` is the reliable path for a single record; a lookup in `values` is rejected with `lookup-unsupported`.
+- The plan reads the current values and previews **before → after** (first five rows), lists ids that do not exist, the write options (bypass / duplicate detection / concurrency), and asks you to confirm scope, fields and bypass.
+- **Permissions**: `plan-update` needs `data.read` on that environment (it has to read the current values); `execute` also needs `data.write` plus a human approval on the card.
+- Run logs land in `.d365/data-sync/runs` (per-id outcome and failure reason); once again it updates only, **never deletes**.
 
 ---
 

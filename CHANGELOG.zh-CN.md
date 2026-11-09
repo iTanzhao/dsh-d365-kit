@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.31.0
+
+批量改数：在一个环境里按显式 id 清单改多条记录的字段，形态与迁移一样——先只读预演，再人工确认。
+
+- `d365_data_sync` 新增 `action=plan-update`：一个环境、一份显式 `ids`（去重，上限 1000 条）加一份 `values`（字段逻辑名 → 新值）。预演会读出现有值做 **before → after** 预览（前几条），列出不存在的 id，并让你确认「记录范围、更新字段、Bypass」三项；
+- **故意不接受 `filter` / `fetchXml`**：按查询条件批量改没有撤销键。先用 `d365_data action=query` 查出 id，再传进来；
+- 只支持标量字段：`values` 里出现 lookup 会以 `lookup-unsupported` 拒绝，因为 lookup 必须按导航属性名绑定（单条改走 `d365_data_write`）；
+- 执行沿用迁移那套保障：`plan-update` 要 `data.read`，`execute` 要 `data.write` 且人在确认卡片上批准；写请求按有界并发跑、默认带 `MSCRM.BypassCustomPluginExecution`，逐 id 的执行记录落在 `.d365/data-sync/runs`。只改不删。
+
 ## 0.30.0
 
 这一版补的是「看现场」：能查一条记录、能调一条消息、能读插件跟踪日志。

@@ -284,6 +284,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 | `action` | 作用 |
 | --- | --- |
 | `plan` | 生成只读计划并落文件，不写任何东西（默认） |
+| `plan-update` | 生成**批量更新**计划（同一环境、按显式 id 清单改字段），不写任何东西 |
 | `show` / `list` / `cancel` | 重看 / 列出 / 取消待执行计划 |
 | `execute` | 弹确认卡片，批准后才写入 |
 
@@ -309,6 +310,30 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 - **权限**：`plan` 要求源和目标都有 `data.read`；`execute` 还要求目标有 `data.write`。预演的「权限（execute 需要）」段会直接告诉你目标环境还缺哪一项——缺 `data.write` 时 `execute` 会被拦下，先去设置页「权限」勾上。
 - **落地**：计划在 `.d365/data-sync/plans`，执行记录在 `.d365/data-sync/runs`（含每条源 GUID → 目标 GUID 与失败原因）。
 - 只新增/修改，**不删记录**；不搬审计字段（createdby/modifiedby 等），owner 按 `ownerMode`（`map` / `keep` / `caller`）处理。
+
+### 批量更新（`plan-update`，同一环境）
+
+改一个环境里已经存在的多条记录，不涉及跨环境。形态和迁移一样是两段式：`plan-update` 只读预演，`execute` 弹卡片批准。
+
+```json
+{ "action": "plan-update", "environment": "dev", "entity": "account",
+  "ids": ["22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333"],
+  "values": { "donotemail": true }, "rationale": "关闭这几个测试账号的邮件" }
+```
+
+| 参数 | 说明 |
+| --- | --- |
+| `environment` | 在哪个环境改（必填，批量更新只改一个环境） |
+| `ids` | 待改记录的主键，**必须显式给出**（去重，上限 1000 条） |
+| `values` | 字段逻辑名 → 新值；只支持标量字段 |
+
+约束与行为：
+
+- **不接受 `filter` / `fetchXml`**：改错一批记录没有撤销键。先用 `d365_data action=query` 查出 id，再传进来。
+- **只支持标量字段**：lookup 需要按导航属性名绑定，用 `d365_data_write` 单条改更可靠；传 lookup 会以 `lookup-unsupported` 拒绝。
+- 预演会读出现有值做 **before → after** 预览（前 5 条），列出找不到的 id、写入选项（Bypass / 抑制重复检测 / 并发），并列出「记录范围、更新字段、Bypass」三项等你确认。
+- **权限**：`plan-update` 要求该环境有 `data.read`（要读现有值）；`execute` 还要求 `data.write`，且人在确认卡片上批准。
+- 执行记录在 `.d365/data-sync/runs`（含每条 id 与失败原因）；同样**只改不删**。
 
 ---
 

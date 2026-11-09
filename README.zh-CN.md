@@ -5,7 +5,7 @@
 Dynamics 365 CE / Dataverse 的**开发与部署助手**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 的 bundle 安装。
 它把一个真实的 D365 组织变成 agent 能直接查的东西：元数据、解决方案层、快照差异、引用关系、迁移风险、代码改动的影响面，以及受控的写入。
 
-> 十六个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
+> 十八个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
 
 ```
 你：DEV 的 account 上 contoso_customertier 这个字段，现在还有哪些表单和视图在用它？
@@ -107,10 +107,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.30.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.31.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.30.0"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.31.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
