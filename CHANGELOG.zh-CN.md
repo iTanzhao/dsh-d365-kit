@@ -4,6 +4,18 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.33.1
+
+自检剩下的 medium 项——都是同一个小毛病的小一号版本：答案看着合理，但数据撑不住。
+
+- **`d365_layers solution=` 原来在分页之后过滤**：层数超过 `top`（默认 500）时，明明存在的层会被报成「该解决方案没有层」。现在过滤进 `$filter`，服务端先筛再截（UAT 实测：`solution: "Active"` 正好返回 `contoso_taxcategoryos` 那一层 Active）；
+- **`d365_diff` 比较 `solution_components` 时用了每个组织各自分配的 GUID**，DEV↔Build 一次报出 22.7 万新增 + 21.8 万删除。现在按 `componenttype` 计数比较，报告里写明；同一次 DEV↔Build 变成「新增 0 / 删除 0 / 修改 362」（计数层面）；
+- **`d365_migrate` 把被导入的解决方案本身和 `Active` 伪解决方案**也算进「将被遮蔽的解决方案」。这两个都不会失去什么：被导入的那个是替换这些层，`Active` 根本不是解决方案；
+- **`d365_code_check` 的「不确定匹配」分支不可达**：相近名返回 `assembly: null`，于是被报成「没有这个程序集」，「请确认映射」的提问从不触发。现在只有一个相近名时会带人工确认，多个相近名仍作为未解决列出；
+- **HTTP 超时原来只管到响应头**：`timedFetch` 在 `fetch` 一解决就清了定时器，服务端发完响应头再卡住正文时，`response.text()` 不受超时约束。现在定时器保持到正文读完，卡住的正文报网络错误；
+- **`d365_reports` 按报告文件计数**：每次分析写的是 `.json` + `.md` 一对，`reportKeep: 20` 实际只留 10 份，而且写完立即清理可能删掉同一对里的另一半。现在一对算一份，一起删；
+- **选项集计划忽略 `language`**：`plan-add-options` / `plan-relabel` 固定写 `languageCode: 1033`，`UpdateOptionValue` 还带 `MergeLabels: false`，把其它语言的标签一起换成了英文。现在计划遵守 `language`（实测 `language: 2052` 落成 `languageCode: 2052`），改标签只合并到指定语言。
+
 ## 0.33.0
 
 全仓自检一遍（`lib/` 47 个模块 + `index.js` + 1.7K 行的 `client.js`），修掉十几个「不报错、但给出错误结论」的 bug。

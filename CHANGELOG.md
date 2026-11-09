@@ -4,6 +4,18 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.33.1
+
+The rest of the self-audit's medium findings — each one a smaller version of the same theme: a plausible answer that the data did not support.
+
+- **`d365_layers solution=` filtered after paging.** A component with more layers than `top` (default 500) could report "this solution has no layer" for a layer that exists just outside the page. The filter is now part of `$filter`, so the server filters before the page is cut (verified against UAT: `solution: "Active"` returns exactly the one Active layer of `contoso_taxcategoryos`);
+- **`d365_diff` on `solution_components` compared GUIDs minted per organization**, so a DEV↔Build comparison reported 227k added and 218k removed. The resource is compared by counting rows per `componenttype`, and the report says so. The same DEV↔Build comparison now reads "0 added / 0 removed / 362 changed" at count level;
+- **`d365_migrate` listed the imported solution itself and the `Active` pseudo-solution** under "solutions whose layers will be shadowed". Neither loses anything: the imported one replaces those layers, `Active` is not a solution;
+- **`d365_code_check`'s uncertain-match branch was unreachable**: a near-miss assembly name returned `assembly: null`, so it was reported as "no such assembly" and the "confirm the mapping" question never fired. A single near miss is now checked with a person; several stay unresolved and are listed;
+- **The HTTP timeout stopped at the response headers.** `timedFetch` cleared its timer as soon as `fetch` resolved, so a server that sends headers and then stalls the body hung past the timeout (`response.text()` was outside it). The timer now stays armed until the body is consumed, and a stalled body is reported as a network error;
+- **`d365_reports` counted report *files*.** Every analysis writes a `.json` + `.md` pair, so `reportKeep: 20` kept ten reports, and enforcing retention right after a write could delete a pair's sibling. Pairs count as one entry and are deleted together;
+- **Option-set plans ignored `language`**: `plan-add-options` / `plan-relabel` always wrote `languageCode: 1033`, and `UpdateOptionValue` sent `MergeLabels: false`, replacing every language's label with the English one. The plans honor `language` (verified: `language: 2052` lands as `languageCode: 2052`) and updating a label now merges into the requested language only.
+
 ## 0.33.0
 
 A self-audit of every module (47 under `lib/`, `index.js` and the 1.7k-line `client.js`) turned up a dozen bugs that each produced a confidently wrong answer rather than an error. This release fixes them.

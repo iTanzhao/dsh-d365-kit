@@ -107,7 +107,7 @@
 | `component` | string | 组件名或 GUID。Entity 用逻辑名；其它类型用该类记录的名称/唯一名；`OptionSet` 用全局选项集名称 |
 | `componentType` | enum | `Entity`、`Attribute`、`SystemForm`、`SavedQuery`、`Workflow`、`WebResource`、`PluginAssembly`、`PluginType`、`SdkMessageProcessingStep`、`CustomAPI`、`OptionSet` |
 | `entity` | string | `componentType=Attribute` 时必填 |
-| `solution` | string | 只看某个解决方案的层（结果内过滤） |
+| `solution` | string | 只看某个解决方案的层（服务端过滤，不会因为层数超过 `top` 而误报「没有层」） |
 | `includeJson` | boolean | 同时取 `msdyn_componentjson`（完整定义，可能很大，写文件） |
 | `top` | integer | 最多取多少条，默认 500 |
 | `environments` / `allEnvironments` | | 跨环境对比活动层 |
@@ -186,6 +186,8 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 时间后缀可简写：`sit@082604` 会匹配 `20261102T082604Z`。
 
 噪声治理：忽略时间戳与所有 `*id` 列（`NOISE_FIELDS`），默认跳过 `organization`（环境身份）。报告在 `.d365/diffs/`；快照超过 24 小时会在报告里提示先重新同步。
+
+`solution_components` 例外：组件的 `objectid` 是按组织分配的 GUID，逐行对齐跨环境只会得到「全部新增 + 全部删除」。这个资源改为按 `componenttype` **计数**比较（`~ componenttype 1：数量 11469→10754`），报告里会写明。要定位具体哪个组件，用 `d365_migrate` 或 `d365_layers`。
 
 ---
 
@@ -346,8 +348,8 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 | `action` | 需要的参数 | 作用 |
 | --- | --- | --- |
 | `policy` | — | 看各环境已授权的能力 |
-| `plan-add-options` | `optionSet` 或 `entity`+`attribute`、`labels` | 新增选项值；代码按 `\|` 前部分去重，值从当前最大值 +1 顺延 |
-| `plan-relabel` | `optionSet` 或 `entity`+`attribute`、`updates` | 改选项标签 |
+| `plan-add-options` | `optionSet` 或 `entity`+`attribute`、`labels` | 新增选项值；代码按 `\|` 前部分去重，值从当前最大值 +1 顺延。标签语言取 `language`（默认 1033） |
+| `plan-relabel` | `optionSet` 或 `entity`+`attribute`、`updates` | 改选项标签。只改 `language` 那一种语言，`MSCRM.MergeLabels: true` 保留其它语言已有标签 |
 | `plan-option-delete` | 同上、`values`、`acknowledge: true` | 删除选项值（高危） |
 | `plan-add-attribute` | `entity`、`schemaName` | 新增字段，类型见下 |
 | `plan-update-attribute` | `entity`、`attribute`、要改的项 | 改显示名 / 描述 / 必填级别 |
@@ -528,6 +530,8 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 `view` 只读 `.d365` 目录内的文件：绝对路径越界会被拒绝，而不是悄悄去读别的文件。大 JSON 默认缩进展开，配 `match` 找一条 GUID 比翻行号快。
 
 清理只碰 `.d365/` 下的已知子目录，删前逐个校验路径前缀；`waivers.json`、`pending-writes/`、配置文件永不被删。
+
+`reports` 按**一份报告**计数而不是按文件：每次分析写的是 `.json` + `.md` 一对，按文件算会让「保留 20 份」实际只留 10 份。
 
 ---
 

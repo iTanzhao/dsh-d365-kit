@@ -107,7 +107,7 @@ Queries `msdyn_componentlayer`: which solutions have overridden a component, the
 | `component` | string | Component name or GUID. Entities use the logical name; other types use the name / unique name of that record type; `OptionSet` uses the global option set name |
 | `componentType` | enum | `Entity`, `Attribute`, `SystemForm`, `SavedQuery`, `Workflow`, `WebResource`, `PluginAssembly`, `PluginType`, `SdkMessageProcessingStep`, `CustomAPI`, `OptionSet` |
 | `entity` | string | Required when `componentType=Attribute` |
-| `solution` | string | Look only at one solution's layers (filtered within the results) |
+| `solution` | string | Look only at one solution's layers (filtered server-side, so a component with more layers than `top` cannot read as "no layer") |
 | `includeJson` | boolean | Also fetch `msdyn_componentjson` (full definition, potentially large, written to a file) |
 | `top` | integer | Maximum records to fetch, default 500 |
 | `environments` / `allEnvironments` | | Compare the active layer across environments |
@@ -186,6 +186,8 @@ Field-level differences between two snapshots.
 Time suffixes can be shortened: `sit@082604` matches `20261102T082604Z`.
 
 Noise control: timestamps and all `*id` columns are ignored (`NOISE_FIELDS`), and `organization` (environment identity) is skipped by default. Reports go to `.d365/diffs/`; if a snapshot is more than 24 hours old, the report suggests re-syncing first.
+
+`solution_components` is the exception: a component's `objectid` is a GUID minted per organization, so aligning rows across environments reports every component as both added and removed. That resource is compared by **counting** rows per `componenttype` instead (`~ componenttype 1: count 11469→10754`), which the report states. To find a specific component, use `d365_migrate` or `d365_layers`.
 
 ---
 
@@ -346,8 +348,8 @@ Metadata changes. **`plan-*` actions are read-only** and only produce a plan; `e
 | `action` | Required parameters | Effect |
 | --- | --- | --- |
 | `policy` | — | Show the capabilities authorized for each environment |
-| `plan-add-options` | `optionSet` or `entity`+`attribute`, `labels` | Add option values; codes are deduplicated by the part before `\|`, and values continue from the current maximum +1 |
-| `plan-relabel` | `optionSet` or `entity`+`attribute`, `updates` | Relabel option values |
+| `plan-add-options` | `optionSet` or `entity`+`attribute`, `labels` | Add option values; codes are deduplicated by the part before `\|`, and values continue from the current maximum +1. The label language is `language` (default 1033) |
+| `plan-relabel` | `optionSet` or `entity`+`attribute`, `updates` | Relabel option values. Only the `language` entry changes; `MSCRM.MergeLabels: true` keeps the other languages' labels |
 | `plan-option-delete` | same as above, `values`, `acknowledge: true` | Delete option values (high risk) |
 | `plan-add-attribute` | `entity`, `schemaName` | Add a field; types below |
 | `plan-update-attribute` | `entity`, `attribute`, the items to change | Change display name / description / required level |
@@ -528,6 +530,8 @@ Local artifacts and disk usage.
 `view` reads only files under `.d365`: an absolute path pointing elsewhere is refused instead of quietly read.
 
 Cleanup touches only known subdirectories under `.d365/`, verifying each path prefix before deleting; `waivers.json`, `pending-writes/` and configuration files are never deleted.
+
+`reports` counts **reports**, not files: each analysis writes a `.json` + `.md` pair, so counting files made "keep 20" retain ten reports.
 
 ---
 
