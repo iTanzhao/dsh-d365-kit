@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.32.1
+
+The previous version shipped the skill but told you to copy it into `~/.dsh/skills/` by hand — installing the bundle did not put it there, which is the same as not shipping it. The plugin now registers it itself.
+
+- New `lib/skill.js`: reads the bundled `skills/d365-troubleshooting/SKILL.md`, parses its front matter and hands it to the Host `skills` registry (`source: "bundled"`, both invocation policies true). Registration is late-bound through `ctx.inject(["skills"], …)`: a Host without that service skips it silently and keeps just the tools;
+- So after `install_bundle` the skill is in the catalog already, and the agent routes to it by description — nobody has to invoke it by name;
+- Disabling or removing the plugin withdraws the registration (it leaves the catalog with the plugin), so there is no leftover skill after an uninstall;
+- The INSTALL sections in both languages changed from "copy it" to "it is already there; edit the copy inside the package". `files` in `package.json` already covers `skills/**`, so the published tarball carries it.
+
 ## 0.32.0
 
 A skill, not another tool: the toolkit could already read traces, but the ordering was nowhere written down.

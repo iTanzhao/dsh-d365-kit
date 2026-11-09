@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.32.1
+
+上一版把 skill 写好了，却让人手工复制到 `~/.dsh/skills/`——装插件不会带过去，等于没装。这一版改成插件自己注册。
+
+- 新增 `lib/skill.js`：读包里的 `skills/d365-troubleshooting/SKILL.md`，解析 front matter，交给 Host 的 `skills` 服务注册（`source: "bundled"`、`modelInvocable`/`userInvocable` 都为真）。注册走 `ctx.inject(["skills"], …)` 晚绑定：宿主没有这个服务时静默跳过，老版本 Host 仍然只有工具；
+- 因此 `install_bundle` 之后 skill 就在技能目录里，agent 按描述自动路由，用户不需要按名字调用；
+- 卸载/禁用插件时注册随之撤销（技能目录里同步消失），不存在「删了插件、skill 还留着」的残留；
+- INSTALL 中英两段从「手动复制」改成「装完即有；要改就改包里那份」；`package.json` 的 `files` 已包含 `skills/**`，发布包带得走。
+
 ## 0.32.0
 
 这一版加的是 skill，不是工具：能力早就有，但「先看什么、后看什么」没写下来。

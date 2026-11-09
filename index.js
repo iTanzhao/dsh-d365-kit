@@ -51,6 +51,7 @@ import { register as registerDataSync } from './lib/tool-data-sync.js'
 import { register as registerInvoke } from './lib/tool-invoke.js'
 import { register as registerTrace } from './lib/tool-trace.js'
 import { registerRoutes } from './lib/settings-http.js'
+import { registerSkills } from './lib/skill.js'
 import { setCapabilityResolver, setDataReadResolver, setDataWriteResolver, setMetadataReadResolver } from './lib/client.js'
 import { makeAnyCapabilityResolver, makeDataReadResolver, makeDataWriteResolver, makeMetadataReadResolver } from './lib/data-policy.js'
 
@@ -107,6 +108,10 @@ export function apply(ctx, config = {}) {
       }
     }
   })
+
+  // The troubleshooting skill travels with the package: registering it here is
+  // what makes installing the bundle enough, with no file to copy by hand.
+  registerSkills(ctx)
 
   // Looked up rather than declared: a headless profile has no HTTP carrier and
   // must not keep the plugin inactive. The settings routes live on the

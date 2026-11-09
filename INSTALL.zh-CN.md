@@ -18,7 +18,7 @@
 ### 方式一：从 npm 装（最短，可升级）
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.32.0"
+plugin_manager install_bundle target="dsh-d365-kit@0.32.1"
 ```
 
 前提是包已经发到 pnpm 用的那个 registry——公网 npm 或公司内网镜像都行。包名没有 scope，不需要配 scope 映射。
@@ -28,7 +28,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.32.0"
 ### 方式二：从 Git 装（不需要 registry）
 
 ```
-plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.32.0"
+plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.32.1"
 ```
 
 ### 方式三：从本地目录装
@@ -66,16 +66,11 @@ d365_metadata resource=entities top=3
 
 都有内容就说明通了。第一次 `d365_sync` 会拉全量元数据（约 125 MB、三分钟左右），不想占盘可以先不做。
 
-### 可选：装排查 skill
+### 排查 skill 随插件一起装
 
-包里带了一个 agent skill：`skills/d365-troubleshooting/SKILL.md`（插件失败怎么查：跟踪级别 → 归并签名 → 取一条完整调用 → 看步骤注册 → 复现）。复制到 DSH home 下就能被 agent 识别：
+包里带了一个 agent skill：`skills/d365-troubleshooting/SKILL.md`（插件失败怎么查：跟踪级别 → 归并签名 → 取一条完整调用 → 看步骤注册 → 复现）。插件加载时会把它注册进 Host 的 skill 注册表，所以装完 bundle 就有了——不需要复制文件，也不用谁按名字手动调用，agent 按描述就会自己用。
 
-```
-mkdir -p ~/.dsh/skills/d365-troubleshooting
-cp skills/d365-troubleshooting/SKILL.md ~/.dsh/skills/d365-troubleshooting/
-```
-
-Windows 下目标是 `%USERPROFILE%\.dsh\skills\d365-troubleshooting\`。就是一份 Markdown，按自己环境的叫法和习惯改都可以。
+要改就直接改装好的包里的这一份（源码安装就改克隆里的那份），然后重载插件；写在别处的副本不会被读到。
 
 ## 升级
 
