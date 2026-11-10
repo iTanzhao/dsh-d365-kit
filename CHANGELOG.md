@@ -4,6 +4,13 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.34.1
+
+`d365_flows show` now prints the trigger's condition.
+
+- It only decoded `subscriptionRequest/filteringattributes` (which columns are watched) and skipped `subscriptionRequest/filterexpression` (the actual condition), so the most important filter — "when a record is created and `statuscode eq 1 and msdyn_activitytype eq 419550000`" — was missing;
+- Of the 401 flows in UAT, more than twenty carry a `filterexpression`, e.g. the four `and` conditions on `Contoso Evaluation Flow` and `msdyn_processedstage eq null and msdyn_opportunitypayload ne null` on `Contoso Insights Flow`.
+
 ## 0.34.0
 
 New tool `d365_flows`: look at Power Automate cloud flows.

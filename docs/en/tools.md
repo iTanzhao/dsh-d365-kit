@@ -634,7 +634,7 @@ Query Power Automate cloud flows. A cloud flow is just a `workflow` row with `ca
 { "action": "refs", "environment": "dev", "entity": "account" }
 ```
 
-`show` prints state, managed flag, the trigger (including detail such as "when a record is created or updated, scope: organization, filtering columns: …"), action count, tables it touches, connectors, connection references, then a step table (first 40 actions; the rest is in the artifact). Nesting shows as ` > ` in the step path, with `(else)` and `(caseName)` marking branches.
+`show` prints state, managed flag, the trigger (including detail such as "when a record is created or updated, scope: organization, filtering columns: …, condition: …"), action count, tables it touches, connectors, connection references, then a step table (first 40 actions; the rest is in the artifact). Nesting shows as ` > ` in the step path, with `(else)` and `(caseName)` marking branches.
 
 Four things worth knowing:
 

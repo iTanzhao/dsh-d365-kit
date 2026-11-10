@@ -4,6 +4,13 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.34.1
+
+`d365_flows show` 的触发器多一行「条件」。
+
+- 之前只解析 `subscriptionRequest/filteringattributes`（监控哪些列），没解析 `subscriptionRequest/filterexpression`（真正的判断条件），于是「当记录创建，条件：`statuscode eq 1 and msdyn_activitytype eq 419550000`」这种最关键的过滤被漏掉；
+- 实测 UAT 401 条云流里，带 `filterexpression` 的有二十多条，例如 `Contoso Evaluation Flow` 的四个 `and` 条件、`Contoso Insights Flow` 的 `msdyn_processedstage eq null and msdyn_opportunitypayload ne null`。
+
 ## 0.34.0
 
 新工具 `d365_flows`：查 Power Automate 云流。
