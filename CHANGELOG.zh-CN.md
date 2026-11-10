@@ -4,6 +4,20 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.34.0
+
+新工具 `d365_flows`：查 Power Automate 云流。
+
+云流在 Dataverse 里就是 `workflow` 表 `category = 5` 的行，所以它和经典工作流同表、同权限、走同一套认证——不新增任何权限闸，也不需要 Power Automate 的 API 权限。
+
+- **`list`**：目录（名称、状态、owner、托管、修改时间），支持 `filter`；owner 名从 `systemusers`/`teams` 批量解析（`ownerid` 是多态查找，`$expand` 会被服务端拒绝）；
+- **`show`**：一条流程的骨架——触发器（含「当记录创建或更新，范围：组织，过滤列：…」这类细节）、动作数、涉及的表、连接器、连接引用，以及前 40 个动作的嵌套路径（`（否则）`、`（caseName）` 标出分支）；
+- **`refs`**：哪些云流会碰某张表。触发器或任意动作命中就列出行，`account` 在 DEV 274 条云流里命中 6 条、`opportunity` 命中 11 条。输出写明「扫描 N/M 条」，扫描被 `scanLimit` 截断时不会说成「没有」；
+- **踩到的坑**：`refs` 最初显式传 `$top: 50`，Dataverse 把显式 `$top` 当成**总量**，正好返回 50 行且不给 `@odata.nextLink`，于是「仅扫 50 条」看起来像「扫完了、没有碰这张表」。现在不传 `$top`，交给分页探测；
+- **`primaryentity` 为什么是 `none`**：云流不绑定单表，表名藏在 `clientdata` 每个动作的参数里（`entityName`），`refs` 就是把它们解析出来反查——这也是 `d365_metadata resource=workflows` 答不了「谁碰了这张表」的原因；
+- **运行历史查不到**：失败在第几次、卡在哪个动作、耗时多少只在 Power Automate 服务侧（另一套 audience 与 `Flow.Read.All`）。这个工具只到「定义」层，文档里写清楚了；
+- 没纳入解决方案的云流同样能看到（落在默认解决方案里，`ismanaged = false`）。
+
 ## 0.33.2
 
 文档：工具参考与排查 skill 的开头各加一张「按问题查」的路由表。

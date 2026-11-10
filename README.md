@@ -5,7 +5,7 @@
 A **development and deployment assistant** for Dynamics 365 CE / Dataverse, installed as a [DeepSeek Harness](https://github.com/deepseek-ai) bundle.
 It turns a real D365 organization into something an agent can query directly: metadata, solution layers, snapshot diffs, references, migration risk, the impact of code changes, and controlled writes.
 
-> Eighteen tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
+> Nineteen tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
 
 ```
 You: which forms and views still use the contoso_customertier field on account in DEV?
@@ -61,6 +61,7 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 | `d365_refs` | Reverse lookup: field → forms/views/processes; web resource → forms and events; assembly → types and steps |
 | `d365_data` | Business records: count / group by / sample (requires `data.read`) |
 | `d365_data_write` | Create or update one business record, executed after confirmation in the conversation (requires `data.write`) |
+| `d365_data_sync` | Mirror records between environments (keeps GUIDs, resolves lookups, reports conflicts), or update one field on a list of records |
 
 ### Writes
 
@@ -75,6 +76,14 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 | `d365_migrate` | Solution migration risk assessment: layer shadowing, missing components, lost option values, version and managed state |
 | `d365_contract` | Contract matrix and drift: assemblies, plugin types, steps, form libraries, handlers, sitemaps, option values; with waivers and trends |
 | `d365_code_check` | Reads a GitLab MR, maps JS/C# changes onto the target environment and reports blocker / warning / manual confirmation |
+
+### Diagnostics
+
+| Tool | Purpose |
+| --- | --- |
+| `d365_trace` | Plug-in trace logs: what ran, what threw, grouped by signature; credentials in the message block are masked (requires `data.read`) |
+| `d365_invoke` | Call one Dataverse message and see the real status and body; GET functions need `data.read`, POST actions need `message.invoke` plus a confirmation each time |
+| `d365_flows` | Power Automate cloud flows (`workflow` rows with `category = 5`): catalog, one flow's trigger/actions/connectors, and which flows touch a given table |
 
 ### Operations
 
@@ -107,10 +116,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.33.2"
+plugin_manager install_bundle target="dsh-d365-kit@0.34.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.33.2"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -253,7 +262,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 | Document | Contents |
 | --- | --- |
 | [docs/en/installation.md](docs/en/installation.md) | Installation, first-time setup, credentials, upgrade, uninstall |
-| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 18 tools |
+| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 19 tools |
 | [docs/en/scenarios.md](docs/en/scenarios.md) | Complete walkthroughs for 8 real scenarios |
 | [docs/en/permissions.md](docs/en/permissions.md) | Capability table, write flow, pre-flight check, safety boundary |
 | [docs/en/checks.md](docs/en/checks.md) | Rules and confidence levels for migration assessment, contract drift and code checks |
@@ -280,7 +289,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 ## Development
 
 ```
-index.js              # Host entry: registers the 18 tools, mounts the settings page routes
+index.js              # Host entry: registers the 19 tools, mounts the settings page routes
 client.js             # settings page (six tabs, no build step)
 lib/
   client.js           # Dataverse Web API client (retry, paging, permission gate)

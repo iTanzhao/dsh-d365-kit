@@ -23,6 +23,7 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 | 这条记录长什么样、有多少条 | `d365_data`（`count`/`group`/`sample`/`query`） | `d365_metadata` |
 | 插件报错，为什么 | `d365_trace summary` → `get`，先 `d365_health` 排除异步作业 | 猜错误码 |
 | 这条消息现在返回什么 | `d365_invoke` | Postman 手拼 |
+| 这条表的逻辑是不是在云流里 / 哪些 flow 会碰它 | `d365_flows refs` → `show` | 在 Power Automate 门户里逐条点开 |
 | 产物太大看不全 | `d365_reports action=view`（`match` 找 GUID） | 全量读文件 |
 
 ## 什么时候用
@@ -86,6 +87,7 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 - 谁引用了这个字段/脚本/程序集：`d365_refs`
 - 一个环境有、另一个环境没有：`d365_contract`（插件步骤/程序集版本漂移）、`d365_layers`（谁盖住了谁）
 - 元数据本身对不上：`d365_metadata resource=attributes ... cast=...`（`DefaultValue`、`OptionSet`、`Targets` 必须先 cast）
+- 逻辑不在插件里、而是被云流接走了：`d365_flows refs entity=<表>` 看哪些 flow 会碰这张表，再 `show` 看它的触发器和步骤（云流的运行历史不在 Dataverse，失败要看 Power Automate 门户）
 
 ## 错误码速查
 

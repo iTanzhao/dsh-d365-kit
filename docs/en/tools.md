@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-18 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+19 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
 
 Conventions:
 
@@ -27,6 +27,7 @@ Conventions:
 | Change metadata: add a column, relabel, add an option value, remove a custom layer | `d365_write` (`plan-*` is read-only, `execute` confirms) | Hand-written Web API |
 | What does this record look like, how many are there | `d365_data` (`count` / `group` / `sample` / `query`) | `d365_metadata` |
 | A plug-in failed — why | `d365_trace summary` → `get`; run `d365_health` first to rule out async jobs | Guessing the error code |
+| Is this table's logic in a cloud flow / which flows touch it | `d365_flows refs` → `show` | Opening each flow in the Power Automate portal |
 | What does this message return right now | `d365_invoke` (GET uses data.read, POST uses message.invoke and confirms every time) | Assembling it in Postman |
 | Will this MR run in the target environment | `d365_code_check` | Reading the diff by eye |
 | The artifact is too big for the conversation | `d365_reports action=view` (`match` to find one GUID) | Loading the whole file |
@@ -609,6 +610,38 @@ Three things worth knowing:
 1. **A successful trace stores an empty string, not null.** Filtering on `exceptiondetails ne null` alone lists clean runs as failures, so "failures only" is `ne null` and `ne ''`.
 2. `summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
 3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). All three actions — `list`, `get` and `summary` — mask them as `***` in both the output and the artifact and tell you how many values they masked. **Traces count as business data** and need "Read business data" (`data.read`).
+
+---
+
+## d365_flows
+
+Query Power Automate cloud flows. A cloud flow is just a `workflow` row with `category = 5` in Dataverse — same table as classic workflows, same permissions, same authentication. **No Power Automate API permission is involved.**
+
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `action` | `list` \| `show` \| `refs` | `list` | `list` the catalog; `show` one flow's skeleton; `refs` which flows touch a table |
+| `name` | string | — | `show`: flow name (exact match; get it from `list`) |
+| `flowId` | string | — | `show`: `workflowid` (GUID) when the name is duplicated or has odd characters |
+| `entity` | string | — | `refs` requires it: table logical name (`account`, `contoso_determinationlogictable`) |
+| `filter` | string | — | `list`: extra OData `$filter`, e.g. `"statecode eq 1"` for enabled flows |
+| `top` | integer | 50 | `list` row count (max 500) |
+| `scanLimit` | integer | 1000 | `refs`: how many flows to scan at most (max 2000); more flows means paging through `clientdata` |
+| `environment` | string | default env | |
+
+```json
+{ "action": "list", "environment": "dev", "filter": "statecode eq 1", "top": 20 }
+{ "action": "show", "environment": "dev", "name": "Contoso Opportunity Research Flow" }
+{ "action": "refs", "environment": "dev", "entity": "account" }
+```
+
+`show` prints state, managed flag, the trigger (including detail such as "when a record is created or updated, scope: organization, filtering columns: …"), action count, tables it touches, connectors, connection references, then a step table (first 40 actions; the rest is in the artifact). Nesting shows as ` > ` in the step path, with `(else)` and `(caseName)` marking branches.
+
+Four things worth knowing:
+
+1. **`primaryentity` is `none` on every flow.** A cloud flow is not bound to one table, so `d365_metadata resource=workflows` cannot tell you which table it touches — the table names live inside each action's parameters in `clientdata`. `refs` parses them all and reverse-looks them up. There is no server-side filter for this, so every definition has to be read.
+2. **Run history is not in Dataverse.** Which run failed, which action it stalled on, how long it took — that only exists on the Power Automate service (`api.flow.microsoft.com`, a separate audience and `Flow.Read.All`). This tool covers the definition layer: what is defined, how it triggers, which tables and connections it uses.
+3. **Flows outside a solution are included.** They sit in the default solution (`ismanaged = false`); `list` finds them and `refs` scans them. Whether they belong in a solution is an ALM question, not a visibility one.
+4. `refs` reports "scanned N of M" — it scans everything up to the cap, and lowering `scanLimit` says so explicitly rather than presenting a truncated scan as "nothing found".
 
 ---
 

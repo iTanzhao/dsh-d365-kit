@@ -2,7 +2,7 @@
 
 **[English](../en/tools.md)** | 简体中文
 
-18 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
+19 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
 
 约定：
 
@@ -27,6 +27,7 @@
 | 改元数据：加字段、改显示名、加选项值、移除自定义层 | `d365_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
 | 这条记录长什么样、有多少条 | `d365_data`（`count` / `group` / `sample` / `query`） | `d365_metadata` |
 | 插件报错了，为什么 | `d365_trace summary` → `get`；先 `d365_health` 排除异步作业 | 猜错误码 |
+| 这条表的逻辑是不是在云流里 / 哪些 flow 会碰这张表 | `d365_flows refs` → `show` | 在 Power Automate 门户里逐条点开 |
 | 这条消息现在返回什么 | `d365_invoke`（GET 走 data.read，POST 走 message.invoke 且每次确认） | Postman 手拼 |
 | 这个 MR 会不会跑不起来 | `d365_code_check` | 肉眼看 diff |
 | 产物太大，对话里看不全 | `d365_reports action=view`（`match` 找一条 GUID） | 让文件工具全量读 |
@@ -609,6 +610,38 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 1. **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也当失败列出来，所以「只看失败」实际是 `ne null` 且 `ne ''`。
 2. `summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
 3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），`list` / `get` / `summary` 三个动作在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
+
+---
+
+## d365_flows
+
+查 Power Automate 云流。云流在 Dataverse 里就是 `workflow` 表 `category = 5` 的行，所以它和经典工作流同表、同权限、走同一套认证——**不需要 Power Automate 的 API 权限**。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `list` \| `show` \| `refs` | `list` | `list` 目录；`show` 一条流程的骨架；`refs` 哪些流程碰某张表 |
+| `name` | string | — | `show`：流程名称（精确匹配，先 `list` 拿到） |
+| `flowId` | string | — | `show`：`workflowid`（GUID），名称有重名或含特殊字符时用它 |
+| `entity` | string | — | `refs` 必填：表逻辑名（如 `account`、`contoso_determinationlogictable`） |
+| `filter` | string | — | `list`：附加 OData `$filter`，例如 `"statecode eq 1"` 只看已开启的 |
+| `top` | integer | 50 | `list` 返回行数（最多 500） |
+| `scanLimit` | integer | 1000 | `refs` 最多扫描多少条流程（最多 2000）；流程多时会逐页读 `clientdata` |
+| `environment` | string | 默认环境 | |
+
+```json
+{ "action": "list", "environment": "dev", "filter": "statecode eq 1", "top": 20 }
+{ "action": "show", "environment": "dev", "name": "Contoso Opportunity Research Flow" }
+{ "action": "refs", "environment": "dev", "entity": "account" }
+```
+
+`show` 输出：状态、托管、触发器（含「当记录创建或更新，范围：组织，过滤列：…」这类细节）、动作数、涉及的表、连接器、连接引用，再给一张步骤表（只列前 40 个动作，其余见产物）。步骤路径用 ` > ` 表达嵌套，`（否则）`、`（caseName）` 标出分支。
+
+四件事值得知道：
+
+1. **`primaryentity` 全是 `none`**。云流不绑定单表，所以 `d365_metadata resource=workflows` 里看不出它碰哪张表；表名藏在 `clientdata` 的每个动作参数里（`entityName`），`refs` 就是把它们全解析出来反查。这一步没有服务端过滤可用，只能逐条读定义。
+2. **运行历史不在 Dataverse**。失败在第几次、卡在哪个动作、耗时多少，这些只在 Power Automate 服务侧（`api.flow.microsoft.com`，另一套 audience 与 `Flow.Read.All`）。这个工具只到「定义」层：谁定义了、怎么触发、碰哪些表、用哪些连接。
+3. **没纳入解决方案的云流也在**。它们落在默认解决方案里（`ismanaged = false`），`list` 能查到、`refs` 能扫到；要不要进解决方案是 ALM 的事，不是可见性问题。
+4. `refs` 的输出会写「扫描 N/M 条」——扫描是上限内全量，`scanLimit` 调小会明确告诉你只扫了一部分，不会把截断说成「没有」。
 
 ---
 

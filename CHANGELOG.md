@@ -4,6 +4,20 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.34.0
+
+New tool `d365_flows`: look at Power Automate cloud flows.
+
+A cloud flow is a `workflow` row with `category = 5` in Dataverse — same table as classic workflows, same permissions, same authentication. No new permission gate, and no Power Automate API permission.
+
+- **`list`** — the catalog (name, state, owner, managed, modified) with an optional `filter`; owner names are resolved in batches from `systemusers`/`teams` (`ownerid` is a polymorphic lookup, so `$expand` is rejected by the service);
+- **`show`** — one flow's skeleton: the trigger (including detail such as "when a record is created or updated, scope: organization, filtering columns: …"), action count, tables it touches, connectors, connection references, and the first 40 actions with their nesting path (`(else)`, `(caseName)` mark branches);
+- **`refs`** — which flows touch a table. A match on the trigger or any action lists a row: `account` matches 6 of the 274 flows in DEV, `opportunity` 11. The output states "scanned N of M", so a scan cut short by `scanLimit` is never reported as "nothing found";
+- **The trap we hit**: `refs` first sent an explicit `$top: 50`. Dataverse treats an explicit `$top` as the total, returns exactly that many rows and no `@odata.nextLink`, so "scanned 50" looked like "scanned everything, nothing matches". It now leaves `$top` to the paging probe;
+- **Why `primaryentity` is `none`**: a cloud flow is not bound to one table. The table names live inside each action's parameters in `clientdata`, which is what `refs` parses — and why `d365_metadata resource=workflows` cannot answer "who touches this table";
+- **Run history is not here**: which run failed, which action stalled, how long it took only exists on the Power Automate service (separate audience, `Flow.Read.All`). This tool covers the definition layer, and the docs say so;
+- Flows outside a solution are included too (they sit in the default solution, `ismanaged = false`).
+
 ## 0.33.2
 
 Documentation: a "which tool for which question" table at the top of the tool reference and of the troubleshooting skill.
