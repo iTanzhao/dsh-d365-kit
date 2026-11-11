@@ -2,7 +2,7 @@
 
 **[English](INSTALL.md)** | 简体中文
 
-`dsh-d365-kit` 是 DeepSeek Harness 的 bundle（Host 插件 + 设置页）。装完会有 16 个 `d365_*` 工具和「设置 → D365 工具箱」页面。
+`dsh-d365-kit` 是 DeepSeek Harness 的 bundle（Host 插件 + 设置页）。装完会有 19 个 `d365_*` 工具和「设置 → D365 工具箱」页面。
 
 更完整的步骤见 [docs/installation.md](docs/zh/installation.md)。
 

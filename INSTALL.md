@@ -2,7 +2,7 @@
 
 **English** | [简体中文](INSTALL.zh-CN.md)
 
-`dsh-d365-kit` is a DeepSeek Harness bundle (host plugin + settings page). Once installed you get 15 `d365_*` tools and a "Settings → D365 Toolkit" page.
+`dsh-d365-kit` is a DeepSeek Harness bundle (host plugin + settings page). Once installed you get 19 `d365_*` tools and a "Settings → D365 Toolkit" page.
 
 For the complete steps, see [docs/en/installation.md](docs/en/installation.md).
 
