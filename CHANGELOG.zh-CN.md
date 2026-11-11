@@ -4,7 +4,7 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
-## 0.34.3
+## 0.34.4
 
 发布进了仓库：`.github/workflows/publish.yml` 会在推送的 `package.json` 版本还没上架 npm 时自动发布。
 
@@ -12,7 +12,8 @@
 - 发布前先跑 `node --check` —— 已经发出去的 npm 版本撤不回、也盖不掉；
 - 认证是显式的：用 `NPM_TRUSTED_PUBLISHING` 变量开启 npm trusted publishing（OIDC、`id-token: write`、带 `--provenance`），或者配 `NPM_TOKEN` secret；两者都没有时只打一条 notice，不让 push 变红；
 - 安装文档不再说「推 tag 就会发布」。
-- `0.34.2` 没有发出来：更早一次手动发布已经把这个版本号留在了注册表的暂存队列里，再直接发同一个版本会被拒（`E409 Cannot publish over previously staged version "0.34.2"`），于是同样的内容以 `0.34.3` 发布。
+- `0.34.2` 没有发出来：更早一次手动发布已经把这个版本号留在了注册表的暂存队列里，再发同一个版本会被拒（`E409 Cannot publish over previously staged version "0.34.2"`）。
+- `0.34.3` 由 CI 发了，但也只进了那个暂存队列：trusted publisher 只允许 stage 发布、不允许直接发布，而「进暂存」时 `npm publish` 同样是退出码 0，看上去像成功了。`0.34.4` 是第一个无需人工批准就上线的版本 —— 前提是在 trusted publisher 的 Allowed actions 里勾上「Publish directly」。
 
 ## 0.34.1
 
