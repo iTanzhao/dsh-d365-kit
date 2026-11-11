@@ -97,11 +97,28 @@ jobs:
       # fail the build. Turn it on with one of:
       #   * repo variable NPM_TRUSTED_PUBLISHING = true  + a trusted publisher on npmjs.com
       #   * repo secret NPM_TOKEN = <granular token with Bypass 2FA>
-      - name: Publish
-        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode != 'none'
+      #
+      # The two auth modes are separate steps on purpose: setup-node always writes
+      # `:_authToken=${NODE_AUTH_TOKEN}` into .npmrc, and handing npm an empty token
+      # makes it send a bad Authorization header instead of falling back to OIDC.
+      - name: Publish with a token
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'token'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
+
+      - name: Publish with trusted publishing
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'oidc'
+        run: |
+          npm config delete //registry.npmjs.org/:_authToken || true
+          npm publish --access public --provenance
+
+      - name: What to check when the publish is rejected
+        if: failure() && steps.check.outputs.published == 'false'
+        run: |
+          echo "::error::npm rejected the publish. The trusted publisher must match this repository exactly:"
+          echo "::error::  owner iTanzhao / repository dsh-d365-kit / workflow publish.yml / environment empty"
+          echo "::error::node $(node --version), npm $(npm --version), registry $(npm config get registry)"
 
       - name: Nothing published (auth not configured)
         if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'none'
