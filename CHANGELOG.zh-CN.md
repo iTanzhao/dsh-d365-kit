@@ -4,6 +4,15 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.34.2
+
+发布进了仓库：`.github/workflows/publish.yml` 会在推送的 `package.json` 版本还没上架 npm 时自动发布。
+
+- 幂等：不改版本号再推 `main`，任务绿着退出、不动 registry，所以「随手 push」是安全的；`v*` tag 可选，只用来和 `package.json` 校验一致；
+- 发布前先跑 `node --check` —— 已经发出去的 npm 版本撤不回、也盖不掉；
+- 认证是显式的：用 `NPM_TRUSTED_PUBLISHING` 变量开启 npm trusted publishing（OIDC、`id-token: write`、带 `--provenance`），或者配 `NPM_TOKEN` secret；两者都没有时只打一条 notice，不让 push 变红；
+- 安装文档不再说「推 tag 就会发布」。
+
 ## 0.34.1
 
 `d365_flows show` 的触发器多一行「条件」。这也是第一个发到 npm 注册表的版本（`install_bundle target="dsh-d365-kit@0.34.1"`），并顺手修掉安装页上过时的工具数（`15` / `16 个` → 19）。

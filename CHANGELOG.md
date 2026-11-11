@@ -4,6 +4,15 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.34.2
+
+Publishing is now part of the repository: `.github/workflows/publish.yml` publishes to npm whenever the pushed `package.json` version is not on the registry yet.
+
+- Idempotent by design — pushing `main` again without a version bump exits green and touches nothing, so "just push" is safe; a `v*` tag is optional and only validated against `package.json`;
+- `node --check` runs before the publish, because a published npm version cannot be withdrawn or overwritten;
+- Authentication is opt-in: npm trusted publishing (OIDC, `id-token: write`, `--provenance`) through the `NPM_TRUSTED_PUBLISHING` variable, or a granular `NPM_TOKEN` secret; with neither configured the job prints a notice instead of failing;
+- The install docs no longer claim that pushing a tag is what publishes.
+
 ## 0.34.1
 
 `d365_flows show` now prints the trigger's condition. This is also the first version published to the npm registry (`install_bundle target="dsh-d365-kit@0.34.1"`), and the install page no longer lies about the tool count (`15` / `16 个` → 19).
