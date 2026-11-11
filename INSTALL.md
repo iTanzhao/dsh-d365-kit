@@ -24,7 +24,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.34.1"
 
 This needs the package to be published to the registry pnpm uses — public npm or an internal mirror. The name has no scope, so no scope mapping is required.
 
-> Publishing to GitHub does not put the package in a registry: with only a GitHub repo, use option 2 (or `npm install github:<user>/<repo>#<tag>`). Pushing a `v*` tag publishes automatically once the `NPM_TOKEN` secret exists (`.github/workflows/publish.yml`).
+> Publishing to GitHub does not put the package in a registry: with only a GitHub repo, use option 2 (or `npm install github:<user>/<repo>#<tag>`). `.github/workflows/publish.yml` publishes on every push to `main` whose `package.json` version is not on npm yet, once either the `NPM_TRUSTED_PUBLISHING` variable (trusted publishing) or the `NPM_TOKEN` secret exists.
 
 ### Option 2: Install from Git (no registry needed)
 

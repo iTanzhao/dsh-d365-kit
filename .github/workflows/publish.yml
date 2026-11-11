@@ -1,0 +1,110 @@
+name: publish
+
+# Publish to npm whenever the version in package.json is new.
+#
+# Two triggers, one rule: if `dsh-d365-kit@<version>` is already on the registry,
+# nothing happens. That makes "just push to main" safe — bump the version and the
+# push publishes it; push again without a bump and the job exits green.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required for npm trusted publishing (OIDC) and for --provenance.
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # npm 11.15+ knows about staged publishing; keep the CLI current so the
+      # publish command has the flags this workflow passes.
+      - name: npm version
+        run: npm install -g npm@latest && npm --version
+
+      - name: Read version
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "Publishing candidate: dsh-d365-kit@$version"
+
+      # A `v*` tag that disagrees with package.json is a mistake, not a release.
+      - name: Check tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "${{ steps.version.outputs.value }}" ]; then
+            echo "::error::tag v$tag does not match package.json ${{ steps.version.outputs.value }}"
+            exit 1
+          fi
+
+      # Cheap sanity check: a syntax error must not reach the registry, because an
+      # npm version cannot be unpublished or overwritten.
+      - name: Syntax check
+        run: |
+          for f in index.js client.js lib/*.js; do
+            node --check "$f"
+          done
+          echo "all files parse"
+
+      - name: Already on the registry?
+        id: check
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if npm view "dsh-d365-kit@${{ steps.version.outputs.value }}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "dsh-d365-kit@${{ steps.version.outputs.value }} is already published; nothing to do."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "dsh-d365-kit@${{ steps.version.outputs.value }} is new."
+          fi
+
+      # Token auth and OIDC auth are mutually exclusive in practice: NODE_AUTH_TOKEN
+      # wins when it exists, trusted publishing takes over otherwise.
+      - name: Choose auth mode
+        id: auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TRUSTED: ${{ vars.NPM_TRUSTED_PUBLISHING }}
+        run: |
+          if [ -n "$NODE_AUTH_TOKEN" ]; then
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+            echo "Using the NPM_TOKEN secret."
+          elif [ "$TRUSTED" = "true" ]; then
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            echo "Using npm trusted publishing (OIDC)."
+          else
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Publishing is opt-in so that a plain `git push` on a fresh clone does not
+      # fail the build. Turn it on with one of:
+      #   * repo variable NPM_TRUSTED_PUBLISHING = true  + a trusted publisher on npmjs.com
+      #   * repo secret NPM_TOKEN = <granular token with Bypass 2FA>
+      - name: Publish
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode != 'none'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
+
+      - name: Nothing published (auth not configured)
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'none'
+        run: |
+          echo "::notice::dsh-d365-kit@${{ steps.version.outputs.value }} is new, but this repository has no npm auth configured."
+          echo "::notice::Set the NPM_TRUSTED_PUBLISHING variable (and a trusted publisher on npmjs.com), or add an NPM_TOKEN secret."

@@ -23,7 +23,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.34.1"
 
 前提是包已经发到 pnpm 用的那个 registry——公网 npm 或公司内网镜像都行。包名没有 scope，不需要配 scope 映射。
 
-> 只推 GitHub 不等于进了 registry：只有 GitHub 仓库时用方式二（或 `npm install github:<user>/<repo>#<tag>`）。配好 `NPM_TOKEN` secret 后推 `v*` tag 会自动发布（`.github/workflows/publish.yml`）。
+> 只推 GitHub 不等于进了 registry：只有 GitHub 仓库时用方式二（或 `npm install github:<user>/<repo>#<tag>`）。`.github/workflows/publish.yml` 会在每次推 `main` 且 `package.json` 版本还没上架时自动发布 —— 前提是配了 `NPM_TRUSTED_PUBLISHING` 变量（trusted publishing）或 `NPM_TOKEN` secret。
 
 ### 方式二：从 Git 装（不需要 registry）
 

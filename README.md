@@ -125,7 +125,16 @@ plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-ki
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
 ```
 
-`dsh-d365-kit@<version>` is resolved from the **npm registry**; a GitHub repository alone is reachable through the `git+https://` form (that is how the second command works today). The repo ships `.github/workflows/publish.yml`, so pushing a `v*` tag publishes to npm once `NPM_TOKEN` is configured.
+`dsh-d365-kit@<version>` is resolved from the **npm registry**; a GitHub repository alone is reachable through the `git+https://` form (that is how the second command works today). `.github/workflows/publish.yml` publishes to npm **on every push to `main` whose `package.json` version is not on the registry yet** — bump the version, push, and npm gets it; push without a bump and the job exits green without doing anything. A `v*` tag is optional and only acts as a consistency check (it must equal the version in `package.json`).
+
+Publishing needs one of two credentials, and the workflow stays a no-op until one exists:
+
+| Auth | What to configure | Secret on disk |
+| --- | --- | --- |
+| Trusted publishing (recommended) | repo variable `NPM_TRUSTED_PUBLISHING = true`, plus a trusted publisher on npmjs.com pointing at this repo and workflow file | none |
+| Granular token | repo secret `NPM_TOKEN` (needs "Bypass two-factor authentication" to publish) | a token you must rotate |
+
+Trusted publishing is the one to prefer: the token path is exactly the thing that leaks into logs and chat transcripts.
 
 After installing, **restart DSH once** so the web client loads the settings page code into its module graph.
 

@@ -25,7 +25,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.34.1"
 
 Works once the package is published to the registry pnpm is configured against — public npm or an internal mirror. The package has no scope, so no scope mapping is needed. To install a specific version pin it as `dsh-d365-kit@<version>`.
 
-> **GitHub alone is not a registry.** A repository on GitHub is reachable directly through the `git+https://...` spec (option 2), and plain `npm install` can also take `github:<user>/<repo>#<tag>`; but `install_bundle target="dsh-d365-kit"` only resolves after the package is published to a registry. The repo ships `.github/workflows/publish.yml`: configure the `NPM_TOKEN` secret, push a `v*` tag, and the package is published for you.
+> **GitHub alone is not a registry.** A repository on GitHub is reachable directly through the `git+https://...` spec (option 2), and plain `npm install` can also take `github:<user>/<repo>#<tag>`; but `install_bundle target="dsh-d365-kit"` only resolves after the package is published to a registry. The repo ships `.github/workflows/publish.yml`: once either the `NPM_TRUSTED_PUBLISHING` variable or the `NPM_TOKEN` secret exists, every push to `main` with a new `package.json` version is published for you.
 
 ### Option 2: install from Git (no registry needed)
 

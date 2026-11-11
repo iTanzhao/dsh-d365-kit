@@ -125,7 +125,16 @@ plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-ki
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
 ```
 
-`dsh-d365-kit@<版本>` 是从 **npm registry** 解析的；只发到 GitHub 时，用第二条的 `git+https://` 形式装。仓库里带 `.github/workflows/publish.yml`，配好 `NPM_TOKEN` 后推 `v*` tag 就会自动发 npm。
+`dsh-d365-kit@<版本>` 是从 **npm registry** 解析的；只发到 GitHub 时，用第二条的 `git+https://` 形式装。`.github/workflows/publish.yml` 会在**每次推 `main` 且 `package.json` 里的版本还没上架时**发布到 npm —— 改版本号、推送，npm 就有了；没改版本号再推，任务绿着退出、什么都不做。`v*` tag 可选，只用来做一致性校验（必须等于 `package.json` 的版本）。
+
+发布需要下面两种凭据之一，两种都没配时工作流是空转的：
+
+| 认证方式 | 要配什么 | 磁盘上的密钥 |
+| --- | --- | --- |
+| Trusted publishing（推荐） | 仓库变量 `NPM_TRUSTED_PUBLISHING = true`，再在 npmjs.com 上把 trusted publisher 指到本仓库和这个 workflow 文件 | 无 |
+| Granular token | 仓库 secret `NPM_TOKEN`（要能发布必须勾「Bypass two-factor authentication」） | 一个你需要轮换的 token |
+
+优先用 trusted publishing：token 那条路正是会漏进日志和聊天记录的东西。
 
 装完**重启一次 DSH**，Web 客户端才会把设置页代码加载进模块图。
 

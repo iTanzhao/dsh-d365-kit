@@ -25,7 +25,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.34.1"
 
 前提是包已经发到 pnpm 配置的 registry——公网 npm 或内网镜像都行。包名没有 scope，不需要配 scope 映射。要装指定版本就写 `dsh-d365-kit@<版本>`。
 
-> **只发 GitHub 不等于发了 npm。** 仓库可以直接用第二种 `git+https://...` 装，`npm install github:<user>/<repo>#<tag>` 也能装；但 `install_bundle target="dsh-d365-kit"` 只有在包进了 registry 之后才解析得到。仓库里带 `.github/workflows/publish.yml`：配好 `NPM_TOKEN` secret，推 `v*` tag 就自动发布。
+> **只发 GitHub 不等于发了 npm。** 仓库可以直接用第二种 `git+https://...` 装，`npm install github:<user>/<repo>#<tag>` 也能装；但 `install_bundle target="dsh-d365-kit"` 只有在包进了 registry 之后才解析得到。仓库里带 `.github/workflows/publish.yml`：配好 `NPM_TRUSTED_PUBLISHING` 变量或 `NPM_TOKEN` secret 后，每次推 `main` 且版本号是新的，就会自动发布。
 
 ### 方式二：从 Git 安装（不需要 registry）
 
