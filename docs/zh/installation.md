@@ -20,7 +20,7 @@
 ### 方式一：从 npm 安装（最短）
 
 ```bash
-plugin_manager install_bundle target="dsh-d365-kit@0.34.2"
+plugin_manager install_bundle target="dsh-d365-kit@0.34.3"
 ```
 
 前提是包已经发到 pnpm 配置的 registry——公网 npm 或内网镜像都行。包名没有 scope，不需要配 scope 映射。要装指定版本就写 `dsh-d365-kit@<版本>`。
@@ -30,7 +30,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.34.2"
 ### 方式二：从 Git 安装（不需要 registry）
 
 ```bash
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.2"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.3"
 ```
 
 DSH 用 pnpm 从 git 拉包。装完确认：
@@ -128,7 +128,7 @@ d365_metadata resource=entities top=3
 ```bash
 # 从 Git 安装的
 plugin_manager remove_bundle target=dsh-d365-kit
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.2"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.3"
 ```
 
 改版本号后必须**先 remove 再 install**：link/pnpm 认为包已存在时会返回 `already-installed`，不会替换代码。

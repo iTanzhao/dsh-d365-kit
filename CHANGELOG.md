@@ -4,7 +4,7 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
-## 0.34.2
+## 0.34.3
 
 Publishing is now part of the repository: `.github/workflows/publish.yml` publishes to npm whenever the pushed `package.json` version is not on the registry yet.
 
@@ -12,6 +12,7 @@ Publishing is now part of the repository: `.github/workflows/publish.yml` publis
 - `node --check` runs before the publish, because a published npm version cannot be withdrawn or overwritten;
 - Authentication is opt-in: npm trusted publishing (OIDC, `id-token: write`, `--provenance`) through the `NPM_TRUSTED_PUBLISHING` variable, or a granular `NPM_TOKEN` secret; with neither configured the job prints a notice instead of failing;
 - The install docs no longer claim that pushing a tag is what publishes.
+- `0.34.2` never shipped: an earlier manual attempt had already put that exact version in the registry's stage queue, and a direct publish of it is refused with `E409 Cannot publish over previously staged version "0.34.2"`. The same content ships as `0.34.3`.
 
 ## 0.34.1
 
