@@ -101,17 +101,39 @@ jobs:
       # The two auth modes are separate steps on purpose: setup-node always writes
       # `:_authToken=${NODE_AUTH_TOKEN}` into .npmrc, and handing npm an empty token
       # makes it send a bad Authorization header instead of falling back to OIDC.
-      - name: Publish with a token
-        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'token'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
-
       - name: Publish with trusted publishing
         if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'oidc'
         run: |
           npm config delete //registry.npmjs.org/:_authToken || true
-          npm publish --access public --provenance
+          set +e
+          output=$(npm publish --access public --provenance 2>&1)
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            # Surface npm's own words as annotations: the log of a public repo is
+            # readable without a token, but the annotation panel is what people
+            # actually look at when a run goes red.
+            printf '%s\n' "$output" | tail -n 25 | while IFS= read -r line; do
+              echo "::error::${line//'%'/'%25'}"
+            done
+            exit "$status"
+          fi
+
+      - name: Publish with a token
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'token'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set +e
+          output=$(npm publish --access public --provenance 2>&1)
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            printf '%s\n' "$output" | tail -n 25 | while IFS= read -r line; do
+              echo "::error::${line//'%'/'%25'}"
+            done
+            exit "$status"
+          fi
 
       - name: What to check when the publish is rejected
         if: failure() && steps.check.outputs.published == 'false'
