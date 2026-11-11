@@ -13,7 +13,7 @@
 - 认证是显式的：用 `NPM_TRUSTED_PUBLISHING` 变量开启 npm trusted publishing（OIDC、`id-token: write`、带 `--provenance`），或者配 `NPM_TOKEN` secret；两者都没有时只打一条 notice，不让 push 变红；
 - 安装文档不再说「推 tag 就会发布」。
 - `0.34.2` 没有发出来：更早一次手动发布已经把这个版本号留在了注册表的暂存队列里，再发同一个版本会被拒（`E409 Cannot publish over previously staged version "0.34.2"`）。
-- `0.34.3` 由 CI 发了，但也只进了那个暂存队列：trusted publisher 只允许 stage 发布、不允许直接发布，而「进暂存」时 `npm publish` 同样是退出码 0，看上去像成功了。`0.34.4` 是第一个无需人工批准就上线的版本 —— 前提是在 trusted publisher 的 Allowed actions 里勾上「Publish directly」。
+- `0.34.3` 由 CI 发了，但只进了那个暂存队列：trusted publisher 当时只允许 stage 发布、不允许直接发布，而「进暂存」时 `npm publish` 同样退出 0，看上去像成功了。后来打开直接发布后它才上线。`0.34.4` 是第一个直接发布、不需要人批的版本。
 
 ## 0.34.1
 

@@ -13,7 +13,7 @@ Publishing is now part of the repository: `.github/workflows/publish.yml` publis
 - Authentication is opt-in: npm trusted publishing (OIDC, `id-token: write`, `--provenance`) through the `NPM_TRUSTED_PUBLISHING` variable, or a granular `NPM_TOKEN` secret; with neither configured the job prints a notice instead of failing;
 - The install docs no longer claim that pushing a tag is what publishes.
 - `0.34.2` never shipped: an earlier manual attempt had already put that exact version in the registry's stage queue, and publishing it again is refused with `E409 Cannot publish over previously staged version "0.34.2"`.
-- `0.34.3` was published by CI but only into that same stage queue: the trusted publisher allowed stage publishing but not direct publishing, and `npm publish` exits 0 when it stages. `0.34.4` is the first version that goes live on its own — turn on "Publish directly" under the trusted publisher's allowed actions.
+- `0.34.3` was published by CI but only into that same stage queue, because the trusted publisher allowed stage publishing but not direct publishing; `npm publish` exits 0 when it stages, so the run looked green. It went live later, when direct publishing was enabled. `0.34.4` is the first version published directly, with nobody approving it by hand.
 
 ## 0.34.1
 
