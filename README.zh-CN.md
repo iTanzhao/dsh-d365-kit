@@ -5,7 +5,7 @@
 Dynamics 365 CE / Dataverse 的**开发与部署助手**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 的 bundle 安装。
 它把一个真实的 D365 组织变成 agent 能直接查的东西：元数据、解决方案层、快照差异、引用关系、迁移风险、代码改动的影响面，以及受控的写入。
 
-> 十九个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
+> 二十个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
 
 ```
 你：DEV 的 account 上 contoso_customertier 这个字段，现在还有哪些表单和视图在用它？
@@ -85,6 +85,12 @@ D365 项目的日常摩擦，大多不是"不会写代码"，而是**环境之�
 | `d365_invoke` | 真正调一次 Dataverse 消息，看状态码与响应体；GET function 需 `data.read`，POST action 需 `message.invoke` 且每次确认 |
 | `d365_flows` | Power Automate 云流（`workflow` 表 `category = 5`）：目录、单条流程的触发器/动作/连接器、哪些流程会碰某张表 |
 
+### 安全角色
+
+| 工具 | 用途 |
+| --- | --- |
+| `d365_access` | 谁拥有某个角色（直接拥有或通过团队继承）、某用户有哪些角色、某角色能对哪些表做什么、什么深度；改角色归属或改角色权限走两段式计划（`role.admin`，默认关闭） |
+
 ### 运维
 
 | 工具 | 用途 |
@@ -116,10 +122,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.34.5"
+plugin_manager install_bundle target="dsh-d365-kit@0.35.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.5"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.35.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -271,7 +277,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 | 文档 | 内容 |
 | --- | --- |
 | [docs/installation.md](docs/zh/installation.md) | 安装、首次配置、凭据、升级、卸载 |
-| [docs/tools.md](docs/zh/tools.md) | 19 个工具的参数、返回与示例 |
+| [docs/tools.md](docs/zh/tools.md) | 20 个工具的参数、返回与示例 |
 | [docs/scenarios.md](docs/zh/scenarios.md) | 8 个真实场景的完整走法 |
 | [docs/permissions.md](docs/zh/permissions.md) | 能力表、写入流程、预检查、安全边界 |
 | [docs/checks.md](docs/zh/checks.md) | 迁移评估、契约漂移、代码检查的规则与置信度 |
@@ -298,7 +304,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 ## 开发
 
 ```
-index.js              # Host 入口：注册 19 个工具、挂设置页路由
+index.js              # Host 入口：注册 20 个工具、挂设置页路由
 client.js             # 设置页（六个标签，无构建步骤）
 lib/
   client.js           # Dataverse Web API 客户端（重试、分页、权限闸）

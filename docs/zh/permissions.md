@@ -48,6 +48,7 @@
 | `entity.update` | `PUT` 实体 URL（`MSCRM.MergeLabels`） | 表 | 改表显示名与描述 |
 | `view.columns` | `PATCH savedqueries(id)` | 视图 | 在系统视图里增删列（只改 `layoutxml`） |
 | `layer.remove` | `RemoveActiveCustomizations` | 组件层 | **永久移除**组件最上面的未受管自定义层（高危；支持表、字段、选项集、表单、视图、流程、Web 资源、插件、自定义 API） |
+| `role.admin` | `Associate` / `AddPrivilegesRole` | 安全角色 | 给用户/团队加角色、移除角色、给角色加或减权限（高危：一次误操作可以把数据开给不该看到的人） |
 | `message.invoke` | 任意 `POST` action | 消息 | 调一条 Dataverse 消息。消息由目标环境的插件实现，可能写数据、发通知或调外部系统（高危，每次调用都在对话里确认） |
 
 设置页「权限」里按环境勾选，支持「复制到其他环境」。
@@ -58,7 +59,7 @@
 
 - **元数据读**：URL 的实体集名在元数据白名单（`EntityDefinitions`、`systemforms`、`savedqueries`、`webresourceset`、`solutions`、`msdyn_componentlayers`…）里，要求 `metadata.read`，报 `metadata-read-forbidden`；
 - **业务数据读**：其余 `GET` 一律按业务数据拦截，要求 `data.read`，报 `data-read-forbidden`；
-- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`；`d365_invoke` 的 `POST` 走 `message.invoke`（被拒绝时 `message-invoke-forbidden`），它的 `GET` function 仍是读，走 `data.read`；
+- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`；`d365_invoke` 的 `POST` 走 `message.invoke`（被拒绝时 `message-invoke-forbidden`），它的 `GET` function 仍是读，走 `data.read`；`d365_access` 的写入（`Associate`、`AddPrivilegesRole`、`RemovePrivilegeRole`）走 `role.admin`（被拒绝时 `role-admin-forbidden`），它的四个读动作仍走 `data.read`；
 
 拦截都发生在**取令牌之前**，不会把请求发到环境里。判定结果按环境缓存 2 秒，设置页改了权限后下一次工具调用就生效。
 

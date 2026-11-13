@@ -5,7 +5,7 @@
 A **development and deployment assistant** for Dynamics 365 CE / Dataverse, installed as a [DeepSeek Harness](https://github.com/deepseek-ai) bundle.
 It turns a real D365 organization into something an agent can query directly: metadata, solution layers, snapshot diffs, references, migration risk, the impact of code changes, and controlled writes.
 
-> Nineteen tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
+> Twenty tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
 
 ```
 You: which forms and views still use the contoso_customertier field on account in DEV?
@@ -85,6 +85,12 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 | `d365_invoke` | Call one Dataverse message and see the real status and body; GET functions need `data.read`, POST actions need `message.invoke` plus a confirmation each time |
 | `d365_flows` | Power Automate cloud flows (`workflow` rows with `category = 5`): catalog, one flow's trigger/actions/connectors, and which flows touch a given table |
 
+### Security
+
+| Tool | Purpose |
+| --- | --- |
+| `d365_access` | Who holds a role (directly or through a team), which roles a user has, what a role may do on which tables at which depth; and two-phase plans to change role membership or privileges (`role.admin`, off by default) |
+
 ### Operations
 
 | Tool | Purpose |
@@ -116,10 +122,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.34.5"
+plugin_manager install_bundle target="dsh-d365-kit@0.35.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.34.5"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.35.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -271,7 +277,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 | Document | Contents |
 | --- | --- |
 | [docs/en/installation.md](docs/en/installation.md) | Installation, first-time setup, credentials, upgrade, uninstall |
-| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 19 tools |
+| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 20 tools |
 | [docs/en/scenarios.md](docs/en/scenarios.md) | Complete walkthroughs for 8 real scenarios |
 | [docs/en/permissions.md](docs/en/permissions.md) | Capability table, write flow, pre-flight check, safety boundary |
 | [docs/en/checks.md](docs/en/checks.md) | Rules and confidence levels for migration assessment, contract drift and code checks |
@@ -298,7 +304,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 ## Development
 
 ```
-index.js              # Host entry: registers the 19 tools, mounts the settings page routes
+index.js              # Host entry: registers the 20 tools, mounts the settings page routes
 client.js             # settings page (six tabs, no build step)
 lib/
   client.js           # Dataverse Web API client (retry, paging, permission gate)

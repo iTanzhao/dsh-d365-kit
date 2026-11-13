@@ -2,12 +2,12 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-19 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+20 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
 
 Conventions:
 
 - **Environment parameters**: `environment` (single), `environments` (array), `allEnvironments` (all). When omitted, the configured default environment is used.
-- **Read vs. write**: only `d365_write execute`, `d365_data_write`, `d365_data_sync execute` and `d365_invoke` (POST) change an environment, and each must be approved by a human on a confirmation card.
+- **Read vs. write**: only `d365_write execute`, `d365_data_write`, `d365_data_sync execute`, `d365_invoke` (POST) and `d365_access execute` change an environment, and each must be approved by a human on a confirmation card.
 - **Artifacts**: `<workspace>/.d365/`. Paths are returned as **absolute paths** and can be opened directly with the file tools.
 
 ## Which tool for which question
@@ -29,6 +29,8 @@ Conventions:
 | A plug-in failed — why | `d365_trace summary` → `get`; run `d365_health` first to rule out async jobs | Guessing the error code |
 | Is this table's logic in a cloud flow / which flows touch it | `d365_flows refs` → `show` | Opening each flow in the Power Automate portal |
 | What does this message return right now | `d365_invoke` (GET uses data.read, POST uses message.invoke and confirms every time) | Assembling it in Postman |
+| Who holds a role / which roles does a user have | `d365_access who-has-role` / `user-roles` (team inheritance listed separately) | Opening users one by one in the UI |
+| What may a role do, on which tables, at what depth | `d365_access role-privileges` (table × eight rights) | Reading the role editor's long list |
 | Will this MR run in the target environment | `d365_code_check` | Reading the diff by eye |
 | The artifact is too big for the conversation | `d365_reports action=view` (`match` to find one GUID) | Loading the whole file |
 
@@ -651,6 +653,49 @@ Four things worth knowing:
 2. **Run history is not in Dataverse.** Which run failed, which action it stalled on, how long it took — that only exists on the Power Automate service (`api.flow.microsoft.com`, a separate audience and `Flow.Read.All`). This tool covers the definition layer: what is defined, how it triggers, which tables and connections it uses.
 3. **Flows outside a solution are included.** They sit in the default solution (`ismanaged = false`); `list` finds them and `refs` scans them. Whether they belong in a solution is an ALM question, not a visibility one.
 4. `refs` reports "scanned N of M" — it scans everything up to the cap, and lowering `scanLimit` says so explicitly rather than presenting a truncated scan as "nothing found".
+
+---
+
+## d365_access
+
+Read and change Dataverse security roles. The model is three links — role → privilege → table × depth — and this tool opens all three: who holds a role (including people who inherit it through a team), which roles a user has, what a role may do on which tables, and how to change one.
+
+| Parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `action` | see below | required | Read: `roles` / `who-has-role` / `user-roles` / `role-privileges`. Write plans: `plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`. Plan management: `list` / `show` / `cancel` / `execute` |
+| `environment` | string | default env | |
+| `role` | string | — | Role name or `roleid`. The same name exists once per business unit |
+| `businessunit` | string | — | Business unit name or GUID: pins a same-named role to one unit (e.g. `AP`) |
+| `user` | string | — | GUID, `user@contoso.com` or full name. Lookups are fuzzy; writes require one match |
+| `team` | string | — | Team GUID or name; when given, the operation targets a team |
+| `entity` | string | — | `role-privileges` only: restrict to one table, e.g. `account` |
+| `privileges` | array | — | For `plan-add-privileges` / `plan-remove-privileges`: `"prvWriteAccount"` or `{"name":"prvWriteAccount","depth":"global"}` |
+| `name` / `filter` / `top` | | | `roles`: name contains, or a raw OData `$filter`; `top` defaults to 200, max 1000 |
+| `planId` | string | — | `show` / `cancel` / `execute` |
+| `rationale` | string | — | Why the change is made; recorded with the plan and the change log |
+
+```json
+{ "action": "roles", "environment": "dev", "name": "Data Stewards" }
+{ "action": "who-has-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP" }
+{ "action": "user-roles", "environment": "dev", "user": "user@contoso.com" }
+{ "action": "role-privileges", "environment": "dev", "role": "Salesperson", "businessunit": "AP", "entity": "account" }
+{ "action": "plan-assign-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP", "user": "user@contoso.com", "rationale": "join the data governance group" }
+```
+
+How to read the output:
+
+- `who-has-role` separates **direct** holders from people who **inherit** a role through a team. Counting only direct holders loses the team members; counting only the union loses the answer to "why can he see this".
+- `role-privileges` is a table × eight rights grid whose cells are depth words: **User** (only records they own), **Business unit**, **Business unit and below**, **Organization** (the whole environment). An empty cell means the right is absent.
+- Access rights are **bit flags**, not 1..8 ordinals: measured in this org, `prvReadAccount` = 1, `prvWriteAccount` = 2, `prvAppendAccount` = 4, `prvAppendToAccount` = 16, `prvCreateAccount` = 32, `prvDeleteAccount` = 65536, `prvShareAccount` = 262144, `prvAssignAccount` = 524288. The tool translates them into words so you never have to remember these.
+- One privilege can cover several tables (`prvReadAccount` also covers `customeraddress`), so the row count exceeds the privilege count — that is correct, not duplication.
+
+Three things to know before changing anything:
+
+1. **Same-named roles exist once per business unit.** UAT has 16 copies of `Data Stewards`, each with its own privileges. A write must resolve to exactly one: pass `businessunit`, or use a `roleid`; otherwise you get `ambiguous-role` with the candidates listed.
+2. **Writes are two-phase.** `plan-*` is read-only and produces a plan in `.d365/pending-writes/`; `execute` first checks the "Change security roles" capability, then asks for confirmation in the chat, and only then writes. Every operation is recorded in `.d365/changes/`.
+3. **Privilege changes are dangerous.** One mistake can open data to people who should not see it, so `role.admin` is off by default and there is no "bulk by filter" mode — you must name the role, the principal and the privileges explicitly.
+
+Reads need "Read business data" (`data.read`); writes need "Change security roles" (`role.admin`, off by default). `role-privileges` reading thousands of rows is normal: a role usually has 2000–18000 privilege records.
 
 ---
 

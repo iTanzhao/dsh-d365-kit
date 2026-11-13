@@ -2,12 +2,12 @@
 
 **[English](../en/tools.md)** | 简体中文
 
-19 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
+20 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
 
 约定：
 
 - **环境参数**：`environment`（单个）、`environments`（数组）、`allEnvironments`（全部）。省略时用配置的默认环境。
-- **只读与写入**：只有 `d365_write execute`、`d365_data_write`、`d365_data_sync execute`、`d365_invoke`（POST）会改环境，且必须人在确认卡片上批准。
+- **只读与写入**：只有 `d365_write execute`、`d365_data_write`、`d365_data_sync execute`、`d365_invoke`（POST）、`d365_access execute` 会改环境，且必须人在确认卡片上批准。
 - **产物**：`<工作区>/.d365/`。返回里给的是**绝对路径**，可直接用文件工具打开。
 
 ## 按问题查
@@ -29,6 +29,8 @@
 | 插件报错了，为什么 | `d365_trace summary` → `get`；先 `d365_health` 排除异步作业 | 猜错误码 |
 | 这条表的逻辑是不是在云流里 / 哪些 flow 会碰这张表 | `d365_flows refs` → `show` | 在 Power Automate 门户里逐条点开 |
 | 这条消息现在返回什么 | `d365_invoke`（GET 走 data.read，POST 走 message.invoke 且每次确认） | Postman 手拼 |
+| 谁有某个角色 / 某个用户有哪些角色 | `d365_access who-has-role` / `user-roles`（团队继承单独列） | 在 UI 里逐个用户点开 |
+| 某个角色能改哪些表、什么深度 | `d365_access role-privileges`（表 × 八种权限） | 看角色编辑器的长列表 |
 | 这个 MR 会不会跑不起来 | `d365_code_check` | 肉眼看 diff |
 | 产物太大，对话里看不全 | `d365_reports action=view`（`match` 找一条 GUID） | 让文件工具全量读 |
 
@@ -651,6 +653,49 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 2. **运行历史不在 Dataverse**。失败在第几次、卡在哪个动作、耗时多少，这些只在 Power Automate 服务侧（`api.flow.microsoft.com`，另一套 audience 与 `Flow.Read.All`）。这个工具只到「定义」层：谁定义了、怎么触发、碰哪些表、用哪些连接。
 3. **没纳入解决方案的云流也在**。它们落在默认解决方案里（`ismanaged = false`），`list` 能查到、`refs` 能扫到；要不要进解决方案是 ALM 的事，不是可见性问题。
 4. `refs` 的输出会写「扫描 N/M 条」——扫描是上限内全量，`scanLimit` 调小会明确告诉你只扫了一部分，不会把截断说成「没有」。
+
+---
+
+## d365_access
+
+查和改 Dataverse 安全角色。安全模型是「角色 → 权限 → 表 × 深度」三段，这个工具把三段都摊开：谁拥有某个角色（含通过团队继承的人）、某个用户有哪些角色、某个角色能对哪些表做什么、以及要改哪一条。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | 见下 | 必填 | 读：`roles` / `who-has-role` / `user-roles` / `role-privileges`；写入计划：`plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`；计划管理：`list` / `show` / `cancel` / `execute` |
+| `environment` | string | 默认环境 | |
+| `role` | string | — | 角色名或 `roleid`。同名角色在多个业务部门各有一份 |
+| `businessunit` | string | — | 业务部门名或 GUID：把同名角色钉到某一部门（如 `AP`） |
+| `user` | string | — | GUID、`user@contoso.com` 或姓名。查询时模糊匹配，写入要求唯一 |
+| `team` | string | — | 团队 GUID 或名称；给了 `team` 就按团队处理 |
+| `entity` | string | — | `role-privileges` 只看某张表，例如 `account` |
+| `privileges` | array | — | `plan-add-privileges` / `plan-remove-privileges` 要处理的权限：`"prvWriteAccount"` 或 `{"name":"prvWriteAccount","depth":"global"}` |
+| `name` / `filter` / `top` | | | `roles`：按名称包含匹配，或直接给 OData `$filter`；`top` 默认 200、最多 1000 |
+| `planId` | string | — | `show` / `cancel` / `execute` 的计划 id |
+| `rationale` | string | — | 为什么改，会写进计划和变更记录 |
+
+```json
+{ "action": "roles", "environment": "dev", "name": "Data Stewards" }
+{ "action": "who-has-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP" }
+{ "action": "user-roles", "environment": "dev", "user": "user@contoso.com" }
+{ "action": "role-privileges", "environment": "dev", "role": "Salesperson", "businessunit": "AP", "entity": "account" }
+{ "action": "plan-assign-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP", "user": "user@contoso.com", "rationale": "加入数据治理组" }
+```
+
+输出读法：
+
+- `who-has-role` 把「直接拥有」和「通过团队继承」分成两段。只数直接的人会漏掉团队带来的人；只数两者之并又会让「他为什么能看到」失去线索。
+- `role-privileges` 是一张「表 × 八种权限」的表，单元格是深度词：**本人**（只有自己拥有的记录）、**本部门**、**本部门及下级**、**组织**（整个环境）。空白表示没有这项权限。
+- 权限是位标志，不是 1..8 的序号：本组织实测 `prvReadAccount` = 1、`prvWriteAccount` = 2、`prvAppendAccount` = 4、`prvAppendToAccount` = 16、`prvCreateAccount` = 32、`prvDeleteAccount` = 65536、`prvShareAccount` = 262144、`prvAssignAccount` = 524288。工具翻译成词，不用背这些数。
+- 一个权限可能覆盖多张表（`prvReadAccount` 同时管 `account` 与 `customeraddress`），所以行数会多于「权限条数」——这是对的，不是重复。
+
+改名要注意的三件事：
+
+1. **同名角色按业务部门各存一份**。UAT 的 `Data Stewards` 有 16 份，权限各算各的。写入时必须能定位到唯一一条：加 `businessunit`，或直接用 `roleid`；否则报 `ambiguous-role` 并列出候选。
+2. **写入是两段式**。`plan-*` 只读、只出计划（落在 `.d365/pending-writes/`）；`execute` 前先校验「改安全角色」能力，再在对话里弹确认卡片，批准后才写，写完整条操作落到 `.d365/changes/`。
+3. **权限变更是高危**。一次误操作可以把数据开给不该看到的人，所以 `role.admin` 默认关闭，且不提供「按 filter 批量改」——必须给显式的角色/用户/团队与权限名。
+
+读取需要「读取业务数据」（`data.read`）；写入需要「改安全角色」（`role.admin`，默认关闭）。`role-privileges` 一次会读上千条权限，属正常：一个角色通常有 2000–18000 条权限记录。
 
 ---
 

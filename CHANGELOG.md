@@ -4,6 +4,18 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.35.0
+
+New `d365_access`: the whole "role → privilege → table × depth" chain, readable and changeable. Tool count 19 → 20.
+
+- Four reads: `roles` (grouped by name — the same role exists once per business unit), `who-has-role` (direct holders and people who inherit it through a team, listed separately), `user-roles` (a user's direct and inherited roles), `role-privileges` (tables × eight rights, each cell a depth word: User / Business unit / Business unit and below / Organization).
+- Four write plans: `plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`. Writes stay two-phase: the plan lands in `.d365/pending-writes/`, `execute` checks the capability, asks on a confirmation card, and records the result in `.d365/changes/`.
+- New capability `role.admin` (group "Security role", **off by default**). This is a privilege change: one mistake can open data to people who should not see it, so there is no "bulk by filter" mode — you name the role and the principal explicitly.
+- Access rights are bit flags, not 1..8 ordinals (measured: `prvReadAccount`=1, `prvWriteAccount`=2, `prvAppendAccount`=4, `prvAppendToAccount`=16, `prvCreateAccount`=32, `prvDeleteAccount`=65536, `prvShareAccount`=262144, `prvAssignAccount`=524288). The old mapping would have shown "create" as "read".
+- Entity set names are resolved per environment: `roleprivileges` is actually `roleprivilegescollection`, `privilege` is `privileges`, `privilegeobjecttypecodes` is `privilegeobjecttypecodesset`. No more guessing — the tool reads `EntitySetName` from `EntityDefinitions` and caches it.
+- A privilege that covers several tables is listed against all of them (`prvReadAccount` covers `account` and `customeraddress`), instead of keeping only the last one.
+- Fixed the 2000-row cap in `role-privileges`: System Administrator has 17816 privilege records; reading only the first 2000 showed "1994 privileges, 0 tables matched".
+
 ## 0.34.5
 
 An outside review (looking for users who hold two particular roles) turned up the same class of problem several times: when the tool was **wrong**, it did not fail — it quietly changed the question.

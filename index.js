@@ -14,6 +14,7 @@
  *   d365_refs       who references a field, script or plugin assembly
  *   d365_data       count / group / sample business records (needs `data.read`)
  *   d365_data_write create or patch one business record (needs `data.write`)
+ *   d365_access     who holds a security role, what it may do, and the plans that change both
  *   d365_data_sync  move business records between environments (plan, then confirm)
  *   d365_invoke     call one action or function and return status + body (needs `message.invoke`)
  *   d365_trace      read plug-in trace logs to explain a failure (needs `data.read`)
@@ -45,6 +46,7 @@ import { register as registerCodeCheck } from './lib/tool-code-check.js'
 import { register as registerRefs } from './lib/tool-refs.js'
 import { register as registerData } from './lib/tool-data.js'
 import { register as registerDataWrite } from './lib/tool-data-write.js'
+import { register as registerAccess } from './lib/tool-access.js'
 import { register as registerContract } from './lib/tool-contract.js'
 import { register as registerHealth } from './lib/tool-health.js'
 import { register as registerReports } from './lib/tool-reports.js'
@@ -93,6 +95,7 @@ export function apply(ctx, config = {}) {
     registerRefs(ctx, state),
     registerData(ctx, state),
     registerDataWrite(ctx, state),
+    registerAccess(ctx, state),
     registerDataSync(ctx, state),
     registerInvoke(ctx, state),
     registerTrace(ctx, state),

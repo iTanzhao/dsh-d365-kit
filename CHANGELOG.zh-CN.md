@@ -4,6 +4,18 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.35.0
+
+新增 `d365_access`：把「角色 → 权限 → 表 × 深度」这条链摊开，既能查也能改。工具数 19 → 20。
+
+- 四个读动作：`roles`（按名聚合，同名角色按业务部门各一份）、`who-has-role`（直接拥有 + 通过团队继承，分段列出）、`user-roles`（某用户直接与继承的角色）、`role-privileges`（表 × 八种权限，单元格是深度词：本人 / 本部门 / 本部门及下级 / 组织）。
+- 四个写入计划：`plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`。写入仍是两段式：计划落 `.d365/pending-writes/`，`execute` 先校验能力、再弹确认卡片，写完记 `.d365/changes/`。
+- 新能力 `role.admin`（分组「安全角色」，**默认关闭**）。这是权限变更：一次误操作可以把数据开给不该看到的人，所以没有「按 filter 批量改」，必须显式给角色与用户/团队。
+- 权限位修正：`accessright` 是位标志而不是 1..8 的序号（实测 `prvReadAccount`=1、`prvWriteAccount`=2、`prvAppendAccount`=4、`prvAppendToAccount`=16、`prvCreateAccount`=32、`prvDeleteAccount`=65536、`prvShareAccount`=262144、`prvAssignAccount`=524288）。原来的映射会把「创建」显示成「读」。
+- 实体集名按环境解析：`roleprivileges` 的 EntitySetName 实际是 `roleprivilegescollection`、`privilege` 是 `privileges`、`privilegeobjecttypecodes` 是 `privilegeobjecttypecodesset`——不再靠猜，改为查 `EntityDefinitions` 取 `EntitySetName` 并缓存。
+- 一个权限覆盖多张表时全部列出（`prvReadAccount` 同时管 `account` 与 `customeraddress`），不再只留最后一个。
+- 修掉 `role-privileges` 的 2000 行截断：System Administrator 有 17816 条权限记录，原来只读前 2000 条，表现为「权限 1994 项、命中 0 张表」。
+
 ## 0.34.5
 
 一次外部复盘（查「同时有某两个角色的用户」）暴露的问题：工具在**答错**的时候没有报错，而是悄悄换了问题。
