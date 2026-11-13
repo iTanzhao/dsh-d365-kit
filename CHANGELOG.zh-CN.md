@@ -4,6 +4,17 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
 
+## 0.34.5
+
+一次外部复盘（查「同时有某两个角色的用户」）暴露的问题：工具在**答错**的时候没有报错，而是悄悄换了问题。
+
+- `$filter` 里写错属性名时不再被当成 `$select` 的问题：以前任何 `0x80060888` 都会去删 `$select` 的列、再删 `$orderby`、最后连整个 `$select` 都删掉，于是可能返回 200 但列不是你要的，或者反复重试最后报一个和原因无关的错。现在只有「这个名字确实在 `$select` 里、且没出现在 `$filter`/`$orderby` 里」才逐列剔除；否则直接报 `unknown-property`，并说明是大小写、lookup（`_<字段>_value`）还是 cast 的问题。降级阶梯（去 `$top`/`$orderby`/`$select`）只在服务端明确说「查询参数不被支持」时执行。
+- lookup 列放进 `select` 会静默变成空列（`businessunitid` 空、`_businessunitid_value` 才有值）。现在自动改显示 `_businessunitid_value` 并写一行说明；真不存在的列会点名「`x` 没有返回：这个名字不能 select（或大小写不对），不是记录里为空」。
+- `d365_data sample` 不再自己发 `$top`（那会让分页探测失效、`hasMore` 恒假），行数够了会写「（还有更多，样例只取前几条）」；默认列也不再拿 `@odata.etag` 当表头。
+- 每个环境的标题现在带「N 请求 / 秒数」，一眼看出这次查询是不是被降级重试拖慢了。
+- 定义端点（`EntityDefinitions` / `RelationshipDefinitions` / `GlobalOptionSetDefinitions`）不发 `$top`：以前每次都要先被拒一次再降级，白花一个请求（元数据查询从 2–3 个请求降到 1 个）；被去掉的列也会点名。
+- `0x80060888` 的 hint 重写：以前说「工具会逐列剔除并重试」，但 `$filter` 场景根本修不好。
+
 ## 0.34.4
 
 发布进了仓库：`.github/workflows/publish.yml` 会在推送的 `package.json` 版本还没上架 npm 时自动发布。

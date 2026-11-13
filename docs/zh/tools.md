@@ -108,7 +108,9 @@
 
 几个真实约束：
 
-- 元数据端点（`EntityDefinitions`）**不接受** `$orderby` 与 `$top`，客户端会逐步降级重试；
+- 元数据定义端点（`EntityDefinitions` / `RelationshipDefinitions` / `GlobalOptionSetDefinitions`）**不接受** `$top`，工具对这类路径直接不发（以前每次都要先被拒一次，白花一个请求）；`$orderby` 被拒时才降级去掉。
+- 降级只发生在 `$select` 上：端点不认的列会被逐列去掉，并在表下点名「这些列该环境不认，已去掉：…」。名字写在 `$filter` / `$orderby` 里时**不会**被改写（那等于换一个问题）——直接报 `unknown-property`，并说明是大小写、lookup 还是 cast 的问题。
+- 每个环境的标题带「N 请求 / 秒数」，被降级重试拖慢时一眼能看出来。
 - 显示名有多语言，跨环境比较请用**逻辑名**，不要用显示名；
 - 实体集名可被自定义，不要硬编码复数形式，用 `entities` 资源或 `d365_data` 的自动解析；
 - `workflows` / `business_rules` 默认只取**定义行**（`type eq 1`）：Dataverse 给每个流程另存一条同名、不同 `workflowid` 的激活行（`type eq 2`），不过滤会看起来像重复、计数也会翻倍；显式传 `filter`（如 `type eq 2`）时默认过滤自动让位，不会 AND 成空集。
@@ -273,6 +275,13 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 计数优先 `$apply=aggregate($count as count)`（不受 `$count=true` 的 5000 上限影响），失败退 `$count=true`；空分组显示「（空）」。
 
 `query` 的标题会区分三种情况：`共 N 行`、`已列 N 条 / 共 M 条（未列全…）`、`返回 N 行（可能还有更多）`。**跨环境复制的 GUID 在目标环境不存在时是 404**，`id` 分支会明确报 `record-not-found`，而不是给一张空表。
+
+两个容易看错的地方，摘要会直接说：
+
+- **lookup 列不能按字段名 select**。`select=businessunitid` 拿回来是空列，值在 `_businessunitid_value`。工具会自动改显示 `_businessunitid_value`，并在表下写「businessunitid 是 lookup：值在 _businessunitid_value…」——所以看到空列时先读那行提示，不要当成「这一列没值」。
+- **每个环境的标题都带「N 请求 / X 秒」**。一次查询要 4 个请求，通常是「实体集解析 + 取数 + 计数」；如果数字明显偏大，说明被降级重试拖慢了（看表下的「这些列该环境不认」）。
+
+`sample` 会标「（还有更多，样例只取前几条）」，避免把「只看了 5 行」当成「一共 5 行」。
 
 用途：改选项集、删字段、收窄筛选条件之前，先知道「这个值还有多少条记录在用」。
 

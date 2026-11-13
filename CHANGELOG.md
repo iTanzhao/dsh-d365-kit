@@ -4,6 +4,17 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.34.5
+
+An outside review (looking for users who hold two particular roles) turned up the same class of problem several times: when the tool was **wrong**, it did not fail — it quietly changed the question.
+
+- A wrong attribute name in `$filter` is no longer treated as a `$select` problem. Previously any `0x80060888` triggered a walk down `$select` → `$orderby` → no `$select` at all, so you could get a 200 whose columns were not the ones you asked for, or a retry loop that ended in an error unrelated to the cause. Now a column is dropped only when that name really is in `$select` and is absent from `$filter`/`$orderby`; otherwise it fails as `unknown-property` and says whether it is casing, a lookup (`_<field>_value`) or a missing cast. The degradation ladder (`$top`/`$orderby`/`$select`) now runs only when the service actually says a query parameter is unsupported.
+- A lookup in `select` silently came back as an empty column (`businessunitid` empty, the value only in `_businessunitid_value`). The column is now switched to `_businessunitid_value` with a note under the table; a column that genuinely does not exist is named — "`x` was not returned: that name cannot be selected (or its casing is wrong), this is not an empty field".
+- `d365_data sample` no longer sends its own `$top` (which defeated the paging probe and made `hasMore` always false), says "(more rows exist, the sample shows only the first few)" when there are, and no longer renders `@odata.etag` as a column header.
+- Every per-environment heading now carries "N requests / seconds", so a query slowed down by fallback retries is visible at a glance.
+- The definition endpoints (`EntityDefinitions` / `RelationshipDefinitions` / `GlobalOptionSetDefinitions`) no longer get a `$top` they are going to reject: one wasted request per query before, now a clean metadata read is a single request. Dropped columns are named too.
+- The `0x80060888` hint was rewritten: it used to promise that the tool would drop columns and retry, which cannot help when the name is in `$filter`.
+
 ## 0.34.4
 
 Publishing is now part of the repository: `.github/workflows/publish.yml` publishes to npm whenever the pushed `package.json` version is not on the registry yet.

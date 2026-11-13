@@ -108,7 +108,9 @@ Queries metadata by category. 20 resource types:
 
 A few real constraints:
 
-- The metadata endpoints (`EntityDefinitions`) **do not accept** `$orderby` and `$top`; the client falls back and retries step by step;
+- The definition endpoints (`EntityDefinitions`, `RelationshipDefinitions`, `GlobalOptionSetDefinitions`) **do not accept** `$top`; the tool simply does not send it for those paths (it used to pay one rejected request per query). `$orderby` is only dropped when the endpoint refuses it.
+- Degradation is limited to `$select`: a column the endpoint rejects is removed one at a time and named under the table ("the endpoint does not recognise these columns, dropped: …"). A name written in `$filter` / `$orderby` is **never** rewritten — that would change the question — it fails as `unknown-property` and says whether it is a casing, lookup or cast problem.
+- Every per-environment heading carries "N requests / seconds", so a query slowed down by fallback retries is visible at a glance.
 - Display names are multilingual, so compare across environments by **logical name**, not display name;
 - Entity set names can be customized; do not hard-code the plural form — use the `entities` resource or `d365_data`'s automatic resolution;
 - `workflows` / `business_rules` return the **definition row only** by default (`type eq 1`): Dataverse stores a second, same-named activation row (`type eq 2`, different `workflowid`) for every process, which otherwise looks like a duplicate and doubles the count. An explicit `filter` (e.g. `type eq 2`) replaces the default instead of ANDing with it, so it never collapses to an empty result.
@@ -273,6 +275,13 @@ Reads business records. **Off by default**: unless "Read business data" (`data.r
 Counting prefers `$apply=aggregate($count as count)` (unaffected by the 5,000 cap of `$count=true`), falling back to `$count=true`; empty groups display as "(empty)".
 
 `query` distinguishes three outcomes in its heading: `共 N 行` (all N rows), `已列 N 条 / 共 M 条` (N of M shown), or `返回 N 行（可能还有更多）` (there may be more). **A GUID copied from another environment is a 404 when it is absent here**, and the `id` path reports `record-not-found` instead of handing back an empty table.
+
+Two things that are easy to misread, both stated in the digest:
+
+- **A lookup cannot be selected by its attribute name.** `select=businessunitid` comes back empty; the value lives in `_businessunitid_value`. The tool switches the column for you and prints "businessunitid is a lookup: the value is in _businessunitid_value …" under the table — read that line before concluding the field is empty.
+- **Every per-environment heading carries "N requests / seconds".** Four requests for one query usually means entity-set resolution + fetch + count; a much larger number means fallback retries did the extra work (look for the "columns dropped" note).
+
+`sample` says "(more rows exist, the sample shows only the first few)" so that "I looked at 5 rows" is never read as "there are 5 rows".
 
 Use it to learn "how many records still use this value" before changing an option set, deleting a field, or narrowing a filter.
 
