@@ -16,8 +16,12 @@ permissions:
   # Required for npm trusted publishing (OIDC) and for --provenance.
   id-token: write
 
+# One package, one publish lane. Serializing every publish run (regardless of
+# ref) means a branch push and a tag push for the same version queue up instead
+# of both seeing "not on the registry yet" and racing — the loser used to fail
+# with E409 "cannot publish over previously staged version".
 concurrency:
-  group: publish-${{ github.ref }}
+  group: npm-publish
   cancel-in-progress: false
 
 jobs:
@@ -101,6 +105,10 @@ jobs:
       # The two auth modes are separate steps on purpose: setup-node always writes
       # `:_authToken=${NODE_AUTH_TOKEN}` into .npmrc, and handing npm an empty token
       # makes it send a bad Authorization header instead of falling back to OIDC.
+      #
+      # A rejection is re-checked against the registry before failing: another run
+      # (or an earlier attempt) may have published the same version in the seconds
+      # since `Already on the registry?` ran. That is a success, not a red build.
       - name: Publish with trusted publishing
         if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'oidc'
         run: |
@@ -110,6 +118,10 @@ jobs:
           status=$?
           printf '%s\n' "$output"
           if [ "$status" -ne 0 ]; then
+            if npm view "dsh-d365-kit@${{ steps.version.outputs.value }}" version >/dev/null 2>&1; then
+              echo "::notice::dsh-d365-kit@${{ steps.version.outputs.value }} appeared on the registry while this run was publishing (a concurrent run won the race); nothing to fix."
+              exit 0
+            fi
             # Surface npm's own words as annotations: the log of a public repo is
             # readable without a token, but the annotation panel is what people
             # actually look at when a run goes red.
@@ -129,6 +141,10 @@ jobs:
           status=$?
           printf '%s\n' "$output"
           if [ "$status" -ne 0 ]; then
+            if npm view "dsh-d365-kit@${{ steps.version.outputs.value }}" version >/dev/null 2>&1; then
+              echo "::notice::dsh-d365-kit@${{ steps.version.outputs.value }} appeared on the registry while this run was publishing (a concurrent run won the race); nothing to fix."
+              exit 0
+            fi
             printf '%s\n' "$output" | tail -n 25 | while IFS= read -r line; do
               echo "::error::${line//'%'/'%25'}"
             done
