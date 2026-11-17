@@ -4,6 +4,28 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.36.0
+
+New `d365_perf` and `d365_trace action=stages`: troubleshooting grows from "what is the structure" to "where did the time go". Tool count 20 → 21.
+
+A real investigation (an upload that had become slow; about two thirds of 75 minutes went into hand-built scaffolding and 12 one-off scripts) did not show a broken tool. It showed that the kit could not explain duration — every answer needed trace logs read by hand and percentiles computed in a scratch script.
+
+- `d365_perf` (`hotspots` / `slowest` / `trend`): reads `performanceexecutionduration` from `plugintracelogs` and aggregates count, total, p50/p95 and max locally. `hotspots` sorts by total (answering "where did the time go"), `slowest` lists individual calls with their `trace` id, `trend` buckets by hour or day. Every answer states the window, the sample size (capped at 5000) and the trace level — when tracing is off or "exceptions only", successful calls are simply not logged and the distribution only covers what was recorded.
+- `d365_trace action=stages`: reads one trace's message block and uses the plug-in's own timestamps (`Time Stamp:- 11/16/2026 06:10:25` or `06:10:25.123`) to compute the gap between adjacent marks, then names the widest one. With fewer than two timestamps it says so instead of printing an empty table.
+- Neither adds a permission: traces still count as business data and need "Read business data" (`data.read`).
+
+## 0.35.1
+
+The parts of the same write-up that map straight onto code: one failing environment must not destroy the whole query, and a short result can still be too wide to read.
+
+- **Per-environment isolation**: `d365_metadata`, `d365_data`, `d365_trace`, `d365_refs` and `d365_flows` used to fail as a whole when one environment threw (only `d365_layers` was isolated). The failing environment now reports "query failed" with the reason, the others still answer, and cross-environment comparison only uses the successful ones.
+- **Wide cells no longer fall between the cracks**: `INLINE_ROWS` is 12 and cells are cut at 40 characters, while artifacts were only written when rows exceeded 12 or `save: true` — so "two rows, one of them a formxml" was neither inlined nor saved. A wide cell now forces the artifact and prints "truncated here, full value in the file".
+- **`entity` is no longer silently ignored**: passing it to a resource that is not per-table (`plugin_steps`) now raises `entity-unsupported` and names the resources that do take it.
+- **Counts no longer pretend to be exact**: `d365_data count` is exact through `$apply=aggregate`; only the `$count` fallback can hit the 5000 cap, and that result is now marked. `d365_health` follows the same rule and shows `—` with the reason instead of reporting 0 when it cannot count reliably.
+- **`d365_trace get` keeps both ends of the message block**: it used to keep only the first 4000 characters while Dataverse retains the last 10240, cutting both ends. Now it is head 1200 + tail 2400 with the omitted length stated, and `get` no longer spends an extra request on the organization's trace level.
+- **`traceId` / `flowId` are validated as GUIDs**: a correlation id or a record id now raises `bad-id` and says what to pass instead.
+- **`d365_refs` counts steps across all types** (it still lists only the first 12 types, but the total is complete), and `d365_health` no longer fetches `RetrieveVersion` twice.
+
 ## 0.35.0
 
 New `d365_access`: the whole "role → privilege → table × depth" chain, readable and changeable. Tool count 19 → 20.

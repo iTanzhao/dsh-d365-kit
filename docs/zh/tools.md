@@ -2,7 +2,7 @@
 
 **[English](../en/tools.md)** | 简体中文
 
-20 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
+21 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
 
 约定：
 
@@ -27,6 +27,7 @@
 | 改元数据：加字段、改显示名、加选项值、移除自定义层 | `d365_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
 | 这条记录长什么样、有多少条 | `d365_data`（`count` / `group` / `sample` / `query`） | `d365_metadata` |
 | 插件报错了，为什么 | `d365_trace summary` → `get`；先 `d365_health` 排除异步作业 | 猜错误码 |
+| 为什么慢、时间花在哪 | `d365_perf hotspots`（合计）→ `slowest` → `d365_trace stages` | 逐条打开跟踪日志 |
 | 这条表的逻辑是不是在云流里 / 哪些 flow 会碰这张表 | `d365_flows refs` → `show` | 在 Power Automate 门户里逐条点开 |
 | 这条消息现在返回什么 | `d365_invoke`（GET 走 data.read，POST 走 message.invoke 且每次确认） | Postman 手拼 |
 | 谁有某个角色 / 某个用户有哪些角色 | `d365_access who-has-role` / `user-roles`（团队继承单独列） | 在 UI 里逐个用户点开 |
@@ -599,8 +600,8 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `action` | `list` \| `get` \| `summary` | `list` | |
-| `traceId` | string | — | `get` 必填：`plugintracelogid`（通常来自 `list` 输出） |
+| `action` | `list` \| `get` \| `summary` \| `stages` | `list` | |
+| `traceId` | string | — | `get` / `stages` 必填：`plugintracelogid`（通常来自 `list` 输出） |
 | `hours` | number | 24 | 回看小时数 |
 | `entity` | string | — | 只看某张表上的跟踪（`primaryentity`，如 `account`） |
 | `typename` | string | — | 只看某个插件类型的跟踪；支持 contains，例如 `ContactSearch` |
@@ -614,13 +615,46 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 { "action": "summary", "environment": "sit", "hours": 168 }
 { "action": "list", "entity": "contact", "message": "Create", "hours": 48 }
 { "action": "get", "traceId": "44444444-4444-4444-4444-444444444444" }
+{ "action": "stages", "traceId": "44444444-4444-4444-4444-444444444444" }
+```
+
+四件事值得知道：
+
+1. **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也当失败列出来，所以「只看失败」实际是 `ne null` 且 `ne ''`。
+2. `summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
+3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），`list` / `get` / `summary` / `stages` 四个动作在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
+4. `stages` 只靠插件自己写进 messageblock 的时间戳（`Time Stamp:- 11/16/2026 06:10:25` 或 `06:10:25.123`），按时间戳间隔排序，给出「最大的一段」——所以它只能回答「时间花在哪一段」，回答不了「为什么这段慢」。插件没写两个以上时间戳时它会直说拆不出来，而不是给个空表。
+
+---
+
+## d365_perf
+
+按插件执行耗时做聚合：时间花在哪些插件上（`hotspots`）、最慢的是哪几次（`slowest`）、每小时怎么变（`trend`）。数据同样来自 `plugintracelogs`，属于业务数据，需要「读取业务数据」（`data.read`）。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `hotspots` \| `slowest` \| `trend` | — | 必填 |
+| `hours` | number | 72 | 回看小时数，最多 720 |
+| `entity` | string | — | 只看某张表（`primaryentity`） |
+| `typename` | string | — | 只看某个插件类型；支持 contains，例如 `ContactSearch` |
+| `message` | string | — | 只看某个消息（`Create` / `Update` …） |
+| `minDuration` | number | — | 只看耗时不低于这个毫秒数的调用 |
+| `filter` | string | — | 附加 `$filter` |
+| `top` | integer | 20 | 返回多少行 / 组，最多 100 |
+| `bucket` | `hour` \| `day` | `hour` | `trend` 的桶大小 |
+| `environment` / `environments` / `allEnvironments` | | 环境选择 |
+
+```json
+{ "action": "hotspots", "environment": "dev", "hours": 168, "top": 10 }
+{ "action": "slowest", "environment": "dev", "entity": "account", "top": 5 }
+{ "action": "trend", "environment": "dev", "hours": 72, "bucket": "hour" }
 ```
 
 三件事值得知道：
 
-1. **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也当失败列出来，所以「只看失败」实际是 `ne null` 且 `ne ''`。
-2. `summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
-3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），`list` / `get` / `summary` 三个动作在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
+1. **`hotspots` 按「合计」排序，回答的是「时间都花在哪」，不是「哪一条最慢」**。一条 2 分钟但只跑 1 次的插件，和 78 次各 1.5 秒的插件，合计可以一样；想知道谁贡献了总量看 `hotspots`，想知道最差的一次看 `slowest`。
+2. 样本上限 5000 条，输出会写明窗口、样本量与**跟踪级别**。跟踪级别是「关闭」或「仅异常」时成功调用根本不写日志，这时的分布只代表有记录的那部分——它会直接这么告诉你，而不是给一个看起来完整的表。
+3. `slowest` 的 `trace` 列就是 `plugintracelogid`，拿它去 `d365_trace action=stages` 拆这一次调用内部的时间戳间隔。
 
 ---
 

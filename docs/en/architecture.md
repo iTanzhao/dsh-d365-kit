@@ -7,9 +7,9 @@
 One DSH bundle in two parts:
 
 ```
-index.js      # Host side: registers the 20 tools, mounts the settings page HTTP routes
+index.js      # Host side: registers the 21 tools, mounts the settings page HTTP routes
 client.js     # Web side: settings page (six tabs, no build step, a browser module directly)
-lib/*.js      # All Host-side logic (49 modules)
+lib/*.js      # All Host-side logic (51 modules)
 ```
 
 Zero runtime dependencies: only Node's built-in `fetch` / `fs` / `path`. No TypeScript, no bundler, no `node_modules`.
@@ -44,7 +44,7 @@ lib/
   waivers.js          Contract waivers
   contract-history.js Drift trend
   data-migrate.js     Business-record migration (plan, lookup resolution, writes, run log)
-  tool-*.js           20 tools, one file per tool (or per related group)
+  tool-*.js           21 tools, one file per tool (or per related group)
 ```
 
 ## Data flow

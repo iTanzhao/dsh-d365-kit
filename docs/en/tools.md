@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-20 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+21 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
 
 Conventions:
 
@@ -27,6 +27,7 @@ Conventions:
 | Change metadata: add a column, relabel, add an option value, remove a custom layer | `d365_write` (`plan-*` is read-only, `execute` confirms) | Hand-written Web API |
 | What does this record look like, how many are there | `d365_data` (`count` / `group` / `sample` / `query`) | `d365_metadata` |
 | A plug-in failed — why | `d365_trace summary` → `get`; run `d365_health` first to rule out async jobs | Guessing the error code |
+| Why is it slow, where does the time go | `d365_perf hotspots` (total) → `slowest` → `d365_trace stages` | Opening trace logs one by one |
 | Is this table's logic in a cloud flow / which flows touch it | `d365_flows refs` → `show` | Opening each flow in the Power Automate portal |
 | What does this message return right now | `d365_invoke` (GET uses data.read, POST uses message.invoke and confirms every time) | Assembling it in Postman |
 | Who holds a role / which roles does a user have | `d365_access who-has-role` / `user-roles` (team inheritance listed separately) | Opening users one by one in the UI |
@@ -599,8 +600,8 @@ Reads plug-in trace logs: who ran, for how long, and why it threw.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `action` | `list` \| `get` \| `summary` | `list` | |
-| `traceId` | string | — | Required for `get`: the `plugintracelogid` (usually from `list`) |
+| `action` | `list` \| `get` \| `summary` \| `stages` | `list` | |
+| `traceId` | string | — | Required for `get` / `stages`: the `plugintracelogid` (usually from `list`) |
 | `hours` | number | 24 | Look-back window in hours |
 | `entity` | string | — | Only traces on one table (`primaryentity`, e.g. `account`) |
 | `typename` | string | — | Only one plug-in type; contains is supported, e.g. `ContactSearch` |
@@ -614,13 +615,46 @@ Reads plug-in trace logs: who ran, for how long, and why it threw.
 { "action": "summary", "environment": "sit", "hours": 168 }
 { "action": "list", "entity": "contact", "message": "Create", "hours": 48 }
 { "action": "get", "traceId": "44444444-4444-4444-4444-444444444444" }
+{ "action": "stages", "traceId": "44444444-4444-4444-4444-444444444444" }
+```
+
+Four things worth knowing:
+
+1. **A successful trace stores an empty string, not null.** Filtering on `exceptiondetails ne null` alone lists clean runs as failures, so "failures only" is `ne null` and `ne ''`.
+2. `summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
+3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). All four actions — `list`, `get`, `summary` and `stages` — mask them as `***` in both the output and the artifact and tell you how many values they masked. **Traces count as business data** and need "Read business data" (`data.read`).
+4. `stages` works only from timestamps the plug-in wrote into its own message block (`Time Stamp:- 11/16/2026 06:10:25` or `06:10:25.123`). It sorts the gaps and names the widest one, so it answers "which stage took the time", never "why that stage is slow". When fewer than two timestamps exist it says so instead of printing an empty table.
+
+---
+
+## d365_perf
+
+Aggregates plug-in duration: which plug-ins the time goes to (`hotspots`), which single calls were slowest (`slowest`), and how it changes hour by hour (`trend`). Same `plugintracelogs` source, so it also needs "Read business data" (`data.read`).
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `action` | `hotspots` \| `slowest` \| `trend` | — | Required |
+| `hours` | number | 72 | Look-back window, max 720 |
+| `entity` | string | — | Only one table (`primaryentity`) |
+| `typename` | string | — | Only one plug-in type; contains is supported, e.g. `ContactSearch` |
+| `message` | string | — | Only one message (`Create` / `Update` …) |
+| `minDuration` | number | — | Only calls at least this many milliseconds |
+| `filter` | string | — | Extra `$filter` |
+| `top` | integer | 20 | Rows / groups to return, max 100 |
+| `bucket` | `hour` \| `day` | `hour` | Bucket size for `trend` |
+| `environment` / `environments` / `allEnvironments` | | Environment selection |
+
+```json
+{ "action": "hotspots", "environment": "dev", "hours": 168, "top": 10 }
+{ "action": "slowest", "environment": "dev", "entity": "account", "top": 5 }
+{ "action": "trend", "environment": "dev", "hours": 72, "bucket": "hour" }
 ```
 
 Three things worth knowing:
 
-1. **A successful trace stores an empty string, not null.** Filtering on `exceptiondetails ne null` alone lists clean runs as failures, so "failures only" is `ne null` and `ne ''`.
-2. `summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
-3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). All three actions — `list`, `get` and `summary` — mask them as `***` in both the output and the artifact and tell you how many values they masked. **Traces count as business data** and need "Read business data" (`data.read`).
+1. **`hotspots` sorts by total, so it answers "where did the time go", not "what was slowest".** One two-minute call and seventy-eight 1.5-second calls can tie on total; use `hotspots` for the budget, `slowest` for the worst single call.
+2. The sample is capped at 5000 rows, and the output always states the window, the sample size and the **trace level**. When tracing is off or "exceptions only", successful calls are not logged at all and the distribution only covers what was recorded — it says so rather than printing a table that looks complete.
+3. The `trace` column from `slowest` is the `plugintracelogid`: feed it to `d365_trace action=stages` to break one call into its own timestamp gaps.
 
 ---
 

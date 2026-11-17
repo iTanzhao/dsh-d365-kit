@@ -18,6 +18,7 @@
  *   d365_data_sync  move business records between environments (plan, then confirm)
  *   d365_invoke     call one action or function and return status + body (needs `message.invoke`)
  *   d365_trace      read plug-in trace logs to explain a failure (needs `data.read`)
+ *   d365_perf       aggregate plug-in execution time: hotspots, slowest calls, trend
  *   d365_flows      Power Automate cloud flows: list, one flow's skeleton, who touches a table
  *   d365_contract   compare plugin registration / option values across environments
  *   d365_health     stuck jobs, running imports, recently installed solutions
@@ -53,6 +54,7 @@ import { register as registerReports } from './lib/tool-reports.js'
 import { register as registerDataSync } from './lib/tool-data-sync.js'
 import { register as registerInvoke } from './lib/tool-invoke.js'
 import { register as registerTrace } from './lib/tool-trace.js'
+import { register as registerPerf } from './lib/tool-perf.js'
 import { register as registerFlows } from './lib/tool-flows.js'
 import { registerRoutes } from './lib/settings-http.js'
 import { registerSkills } from './lib/skill.js'
@@ -99,6 +101,7 @@ export function apply(ctx, config = {}) {
     registerDataSync(ctx, state),
     registerInvoke(ctx, state),
     registerTrace(ctx, state),
+    registerPerf(ctx, state),
     registerFlows(ctx, state),
     registerContract(ctx, state),
     registerHealth(ctx, state),
