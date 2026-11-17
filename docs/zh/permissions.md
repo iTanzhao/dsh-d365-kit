@@ -59,7 +59,7 @@
 
 - **元数据读**：URL 的实体集名在元数据白名单（`EntityDefinitions`、`systemforms`、`savedqueries`、`webresourceset`、`solutions`、`msdyn_componentlayers`…）里，要求 `metadata.read`，报 `metadata-read-forbidden`；
 - **业务数据读**：其余 `GET` 一律按业务数据拦截，要求 `data.read`，报 `data-read-forbidden`；
-- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`；`d365_invoke` 的 `POST` 走 `message.invoke`（被拒绝时 `message-invoke-forbidden`），它的 `GET` function 仍是读，走 `data.read`；`d365_access` 的写入（`Associate`、`AddPrivilegesRole`、`RemovePrivilegeRole`）走 `role.admin`（被拒绝时 `role-admin-forbidden`），它的四个读动作仍走 `data.read`；
+- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`；`d365_invoke` 的 `POST` 需要 `message.invoke`（被拒绝时 `message-invoke-forbidden`）**和** `data.write`（它的插件可能改数据），它的 `GET` function 仍是读，走 `data.read`；`d365_access` 的写入（`Associate`、`AddPrivilegesRole`、`RemovePrivilegeRole`）走 `role.admin`（被拒绝时 `role-admin-forbidden`），它的四个读动作仍走 `data.read`；
 
 拦截都发生在**取令牌之前**，不会把请求发到环境里。判定结果按环境缓存 2 秒，设置页改了权限后下一次工具调用就生效。
 
@@ -96,7 +96,7 @@ agent 调 `d365_write action=execute planId=...`，会：
 4. 弹确认卡片：环境、目标、操作条数、前 10 条操作；含删除时额外提示不可恢复；
 5. 点「批准执行」→ 逐条写入 → 后台发布 → 记审计。
 
-也可以到设置页「计划」标签里审阅并执行（同样的二次红色确认）。两条入口共用同一套校验。
+也可以到设置页「计划」标签里审阅并执行**元数据**计划（同样的二次红色确认）。两条入口共用同一套校验。安全角色计划（`d365_access`）只在对话里那张卡片上执行：设置页会拒绝并提示「安全角色计划只能在 d365_access 的对话里执行」——角色、对象与权限是在卡片上写清的。
 
 ### 计划状态
 
@@ -154,7 +154,7 @@ Dataverse 在导入或发布期间持有定制化锁。微软第一方更新就�
 
 ## 安全边界
 
-- **写接口只接受设置页**：`/write/policy`、`/write/cancel`、`/write/execute`、`/write/publish` 要求 `x-d365-meta-write: 1` 头。跨站页面要带这个头必须过 CORS 预检，而这些路由不回应预检；若请求里有 `Origin`，还必须同源。认证通道会把 URL 改写成 `http://dsh.internal` 并吞掉 `Origin`，所以不能只靠 Origin 判断。被拒的请求记 `.d365/write-guard.log`。
+- **写接口挡的是别的页面，不是本机程序**：`/write/policy`、`/write/cancel`、`/write/execute`、`/write/publish` 要求 `x-d365-meta-write: 1` 头。跨站页面要带这个头必须过 CORS 预检，而这些路由不回应预检；若请求里有 `Origin`，还必须同源。认证通道会把 URL 改写成 `http://dsh.internal` 并吞掉 `Origin`，所以不能只靠 Origin 判断。以同一用户身份运行的程序同样能发这个头——它不是「人点过按钮」的证明。真正约束写入的是计划文件：人批准的计划 id 与内容、保证只执行一次的锁、执行前重新核对的权限。被拒的请求记 `.d365/write-guard.log`。
 - **重试只对安全方法**：`GET`/`HEAD` 在网络错误与 5xx 上重试；`POST`/`PATCH`/`DELETE` 只在 **429**（服务端明确没执行）时重试。写入超时按「可能已生效」报错，让人去环境核对，而不是悄悄重发。
 - **重新发布也要过门槛**：该环境必须仍持有当时那项能力，且先做一次空闲检查（忙时返回 409，而不是原始 429）。
 - **取消与执行一样拒绝非 `pending`**：不会出现「页面说取消了、后台还在写」。

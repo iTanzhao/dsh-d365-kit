@@ -29,7 +29,7 @@ Conventions:
 | A plug-in failed — why | `d365_trace summary` → `get`; run `d365_health` first to rule out async jobs | Guessing the error code |
 | Why is it slow, where does the time go | `d365_perf hotspots` (total) → `slowest` → `d365_trace stages` | Opening trace logs one by one |
 | Is this table's logic in a cloud flow / which flows touch it | `d365_flows refs` → `show` | Opening each flow in the Power Automate portal |
-| What does this message return right now | `d365_invoke` (GET uses data.read, POST uses message.invoke and confirms every time) | Assembling it in Postman |
+| What does this message return right now | `d365_invoke` (GET uses data.read; POST uses message.invoke + data.write and confirms every time) | Assembling it in Postman |
 | Who holds a role / which roles does a user have | `d365_access who-has-role` / `user-roles` (team inheritance listed separately) | Opening users one by one in the UI |
 | What may a role do, on which tables, at what depth | `d365_access role-privileges` (table × eight rights) | Reading the role editor's long list |
 | Will this MR run in the target environment | `d365_code_check` | Reading the diff by eye |
@@ -193,7 +193,7 @@ attributes.json   # only with includeAttributes
 
 The manifest is the only basis for telling "not in the environment" apart from "not collected". A full snapshot is roughly 125 MB and takes about three minutes; by default 2 are kept per environment.
 
-After a sync, retention-policy cleanup runs automatically and snapshots are compacted into single-line JSON.
+After a sync, retention-policy cleanup runs automatically and snapshots are compacted into single-line JSON — except when `keep` was given explicitly: then exactly that many are kept for the environment and the retention count is not applied on top of it.
 
 ---
 
@@ -214,7 +214,9 @@ Field-level differences between two snapshots.
 
 Time suffixes can be shortened: `sit@082604` matches `20261102T082604Z`.
 
-Noise control: timestamps and all `*id` columns are ignored (`NOISE_FIELDS`), and `organization` (environment identity) is skipped by default. Reports go to `.d365/diffs/`; if a snapshot is more than 24 hours old, the report suggests re-syncing first.
+Noise control: timestamps and all `*id` columns are ignored (`NOISE_FIELDS`), and `organization` (environment identity) is skipped by default. Rows are matched on their identity (`name` plus the scope column — `objecttypecode` for forms, `returnedtypecode` for views, `primaryentity` elsewhere), so two forms with the same name are two rows, not one. Reports go to `.d365/diffs/`; if a snapshot is more than 24 hours old, the report suggests re-syncing first.
+
+A row that exists on only one side is reported as added/removed only when the other side is **complete** for that resource. When the sync hit a row cap, a per-entity failure or an unreadable snapshot, the row is listed as `未确认` / `?` with the reason instead of being called removed — "we did not fetch it" and "the environment does not have it" are different answers.
 
 `solution_components` is the exception: a component's `objectid` is a GUID minted per organization, so aligning rows across environments reports every component as both added and removed. That resource is compared by **counting** rows per `componenttype` instead (`~ componenttype 1: count 11469→10754`), which the report states. To find a specific component, use `d365_migrate` or `d365_layers`.
 
@@ -263,7 +265,7 @@ Reads business records. **Off by default**: unless "Read business data" (`data.r
 | `select` | string | Columns returned by `sample` / `query`, comma-separated; `query` without it returns whatever columns the rows carry |
 | `orderby` | string | `query` sort, e.g. `modifiedon desc` |
 | `expand` | string | `query` `$expand`, e.g. `primarycontactid($select=fullname)` |
-| `id` | string | `query`: one record by primary key (GUID, or a quoted alternate key such as `'contoso_001'`) |
+| `id` | string | `query`: one record by primary key (a GUID, or an alternate key written as `字段='值'`, e.g. `contoso_code='001'`) |
 | `top` | integer | `sample` rows (default 5, max 100); `group` first N groups (default 20); `query` rows (default 25, max 500) |
 | `environment` / `environments` / `allEnvironments` | | Environment selection |
 
@@ -330,7 +332,7 @@ Moves business records from one environment to another. The default is **mirror*
 
 Three decisions are made before anything moves (the dry run lists all three; change one and re-run `plan`):
 
-1. **Scope**: `since` (a time window; `mode=new` uses createdon, `mode=modified` uses modifiedon), `filter` (OData `$filter`), `ids`, or `fetchXml`. With none of them the whole table is the default; when that is large the plan says so and recommends narrowing it, and `maxRecords` caps how many rows this plan reads.
+1. **Scope**: `since` (a time window; `mode=new` uses createdon, `mode=modified` uses modifiedon; a timestamp without an offset is read as local time), `filter` (OData `$filter`), `ids`, or `fetchXml`. With none of them the whole table is the default; when that is large the plan says so and recommends narrowing it, and `maxRecords` caps how many rows this plan reads.
 2. **Fields**: `fields` omitted means every writable column. A field list that **includes the primary key** (`xxxid`) keeps GUIDs identical; a list **without** it lets the target assign new ids. `keepGuid` can still override either way.
 3. **Bypass custom plugins**: on by default (`bypassPlugins: true` sends `MSCRM.BypassCustomPluginExecution`, so the target's synchronous plugins do not fire and cannot kick off downstream notifications/integrations). Pass `bypassPlugins: false` to let them run.
 
@@ -590,7 +592,7 @@ Calls one Dataverse message (action or function) and returns the HTTP status and
 { "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
 ```
 
-**The capability follows the method**: a `GET` function is a read and needs "Read business data" (`data.read`); a `POST` action needs "Call messages" (`message.invoke`, off by default). Every POST asks for confirmation in the chat with the environment, path and body. **A failed call does not throw** — it returns the HTTP status, Dataverse error code and response body verbatim, which is exactly the part you need when reproducing a problem.
+**The capability follows the method**: a `GET` function is a read and needs "Read business data" (`data.read`); a `POST` action needs "Call messages" (`message.invoke`, off by default) **and** "Change business data" (`data.write`) — the message is implemented by the target's plug-ins, so it may write data. Every POST asks for confirmation in the chat with the environment, path and body. **A failed call does not throw** — it returns the HTTP status, Dataverse error code and response body verbatim, which is exactly the part you need when reproducing a problem.
 
 ---
 

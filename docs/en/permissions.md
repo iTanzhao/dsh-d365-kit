@@ -59,7 +59,7 @@ The decision lives in one place, `lib/client.js`, so a new tool cannot bypass it
 
 - **Metadata read**: the entity set name in the request URL is on the metadata allowlist (`EntityDefinitions`, `systemforms`, `savedqueries`, `webresourceset`, `solutions`, `msdyn_componentlayers`…) and requires `metadata.read`; it fails with `metadata-read-forbidden`;
 - **Business-data read**: every other `GET` is blocked as business data and requires `data.read`; it fails with `data-read-forbidden`;
-- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`. A `d365_invoke` `POST` goes through `message.invoke` instead (failing as `message-invoke-forbidden`), while its `GET` function is still a read and needs `data.read`. A `d365_access` write (`Associate`, `AddPrivilegesRole`, `RemovePrivilegeRole`) goes through `role.admin` (failing as `role-admin-forbidden`), while its four read actions still need `data.read`.
+- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`. A `d365_invoke` `POST` needs `message.invoke` (failing as `message-invoke-forbidden`) **and** `data.write` (its plug-ins may change data), while its `GET` function is still a read and needs `data.read`. A `d365_access` write (`Associate`, `AddPrivilegesRole`, `RemovePrivilegeRole`) goes through `role.admin` (failing as `role-admin-forbidden`), while its four read actions still need `data.read`.
 
 Every gate fires **before a token is acquired**, so the request never reaches the environment. Decisions are cached per environment for 2 seconds, so a change in the settings page applies to the next tool call.
 
@@ -96,7 +96,7 @@ The agent calls `d365_write action=execute planId=...`, which:
 4. Shows a confirmation card: environment, targets, operation count, the first 10 operations; with deletions it adds an unrecoverable warning;
 5. Click "Execute now" → operations are written one by one → publish runs in the background → the run is audited.
 
-You can also review and execute from the Pending changes tab in the settings page (the same second, red confirmation). Both entry points share the same checks.
+You can also review and execute metadata plans from the Pending changes tab in the settings page (the same second, red confirmation). Both entry points share the same checks. Security-role plans (`d365_access`) run only from their own card in the conversation: the page refuses them with "安全角色计划只能在 d365_access 的对话里执行", because the card is where the role, the principal and the privileges are spelled out.
 
 ### Plan states
 
@@ -154,7 +154,7 @@ Writes need no publish (business data is not metadata). The audit records field 
 
 ## Safety boundaries
 
-- **Write endpoints accept only the settings page**: `/write/policy`, `/write/cancel`, `/write/execute`, `/write/publish` require an `x-d365-meta-write: 1` header. A cross-site page must pass a CORS preflight to send that header, and these routes never answer preflights; if the request carries an `Origin`, it must also be same-origin. The auth channel rewrites the URL to `http://dsh.internal` and swallows `Origin`, so Origin alone cannot be the test. Rejected requests are logged to `.d365/write-guard.log`.
+- **Write endpoints are guarded against other pages, not against local programs**: `/write/policy`, `/write/cancel`, `/write/execute`, `/write/publish` require an `x-d365-meta-write: 1` header. A cross-site page must pass a CORS preflight to send that header, and these routes never answer preflights; if the request carries an `Origin`, it must also be same-origin. The auth channel rewrites the URL to `http://dsh.internal` and swallows `Origin`, so Origin alone cannot be the test. A program running as the same user can send the header too — the guard is not proof that a person clicked. What actually limits a write is the plan file: the id and contents the person approved, a lock so it runs once, and a fresh capability check at execution. Rejected requests are logged to `.d365/write-guard.log`.
 - **Retries only for safe methods**: `GET`/`HEAD` retry on network errors and 5xx; `POST`/`PATCH`/`DELETE` retry only on **429** (the server explicitly did not execute). A write timeout is reported as "may have taken effect", for a human to check in the environment, rather than being silently resent.
 - **Republishing passes the same gate**: the environment must still hold the capability it had at the time, and an idle check runs first (a busy environment returns 409 rather than a raw 429).
 - **Cancel rejects non-`pending` just like execute**: there is no "the page says cancelled while the backend keeps writing".

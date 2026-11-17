@@ -138,7 +138,7 @@ DSH's hard requirements (all of these have bitten us):
 - The six tabs' panels are **mounted at the same time**, with inactive ones hidden by `display:none` — switching tabs does not lose edit state;
 - Copy ships a built-in Chinese/English dictionary; `t()` computes on every call from `localeService.getLocale().active`, independent of whether `locale.register` succeeded;
 - Language switches re-render by subscribing to locale changes;
-- Every write operation carries `x-d365-meta-write: 1` (the Host uses it to reject requests that do not come from the settings page).
+- Every write operation carries `x-d365-meta-write: 1`. It is a cross-site guard, not proof of a click: a program running as the same user can send the header too. What a human actually approves is the plan id and its contents, and the capability is re-checked when the plan executes.
 
 **The module id must match the package name**, otherwise the loader runs it as two modules, reports `duplicate factory registration`, and the whole settings page disappears.
 

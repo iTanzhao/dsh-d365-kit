@@ -70,10 +70,13 @@ window.__ModuleLoader__.load({
         'saved': 'Saved.',
         'savedSecrets': 'Saved; the secret went to d365.secrets.json.',
         'loadFailed': 'Could not load the configuration: {error}',
+        'refreshFailed': 'Could not refresh: {error} — retrying.',
+        'retry': 'Retry',
         'saveFailed': 'Could not save: {error}',
         'checkOk': 'Connected: {name} ({version})',
         'checkFail': 'Connection failed: {error}',
         'checkMissing': 'Missing credentials: {list}',
+        'checkStale': 'Credentials changed — test again.',
         'issues': 'Configuration warnings',
         'files': 'Config: {config}',
         'secretFile': 'Secrets: {secrets}',
@@ -82,6 +85,8 @@ window.__ModuleLoader__.load({
         'duplicate': 'Duplicate key: {key}',
         'existing': 'already saved',
         'keyHint': 'Short key the tools use, e.g. dev.',
+        'keyRequired': 'The key cannot be empty.',
+        'keyInvalid': 'Key "{key}" may only contain letters, digits, "-" and "_".',
         'write.title': 'Write permissions',
         'write.desc': 'Choose what this machine may do in each environment. Metadata reads are on by default; business records need "Read business data". Metadata changes need a capability here and still require a confirm click.',
         'write.gate': 'Every request is checked against the target environment\'s grants below before it leaves this machine; a tool cannot skip the check.',
@@ -103,6 +108,7 @@ window.__ModuleLoader__.load({
         'write.executing': 'Executing…',
         'write.back': 'Cancel',
         'write.cancelPlan': 'Discard plan',
+        'write.cancelling': 'Discarding…',
         'write.warningTitle': 'This writes to a real environment',
         'write.warningBody': 'The following operations will run against {env} immediately. Dataverse metadata changes cannot be rolled back automatically.',
         'write.destructiveBody': 'This includes a deletion that cannot be undone: the column or option value is removed permanently. Check the names before confirming.',
@@ -113,6 +119,11 @@ window.__ModuleLoader__.load({
         'write.recent': 'Recent changes',
         'write.recentLine': '{time} · {env} · {ok} ok / {failed} failed',
         'plans.more': '… {count} more',
+        'plans.statusRunning': 'running — or the last run was interrupted',
+        'plans.statusFailed': 'last run failed',
+        'plans.statusDone': 'already executed',
+        'plans.notPending': 'Only pending plans can be executed. Check .d365/changes for the run record, then discard this plan and prepare a new one.',
+        'plans.destructive': 'Destructive: deletes or removes metadata',
         'write.publishRunning': 'publishing…',
         'write.published': 'published',
         'write.publishFailed': 'publish failed: {error}',
@@ -200,10 +211,13 @@ window.__ModuleLoader__.load({
         'saved': '已保存。',
         'savedSecrets': '已保存，密钥写入了 d365.secrets.json。',
         'loadFailed': '读取配置失败：{error}',
+        'refreshFailed': '刷新失败：{error}，正在重试。',
+        'retry': '重试',
         'saveFailed': '保存失败：{error}',
         'checkOk': '连接正常：{name}（{version}）',
         'checkFail': '连接失败：{error}',
         'checkMissing': '缺少凭据：{list}',
+        'checkStale': '环境已修改，请重新测试。',
         'issues': '配置告警',
         'files': '配置文件：{config}',
         'secretFile': '密钥文件：{secrets}',
@@ -212,6 +226,8 @@ window.__ModuleLoader__.load({
         'duplicate': 'key 重复：{key}',
         'existing': '已保存',
         'keyHint': '工具里用的短名，例如 dev。',
+        'keyRequired': 'key 不能为空。',
+        'keyInvalid': 'key "{key}" 只能包含字母、数字、"-" 和 "_"。',
         'write.title': '权限',
         'write.desc': '选择这台机器可以对哪些环境做什么。元数据默认可读；读取业务数据需要勾「读取业务数据」；元数据修改需要先在这里授权，执行前仍要确认。',
         'write.gate': '每一次访问在发出前都会按目标环境核对下面的勾选，任何工具都绕不过这道检查。',
@@ -233,6 +249,7 @@ window.__ModuleLoader__.load({
         'write.executing': '执行中…',
         'write.back': '返回',
         'write.cancelPlan': '丢弃计划',
+        'write.cancelling': '丢弃中…',
         'write.warningTitle': '这是对真实环境的写入',
         'write.warningBody': '以下操作会立即作用到 {env}。Dataverse 的元数据变更无法自动回滚，请先核对操作列表。',
         'write.destructiveBody': '其中包含不可恢复的删除操作：被删的字段或选项值连同其数据一起消失，无法通过重新部署找回。确认前请核对名称。',
@@ -243,6 +260,11 @@ window.__ModuleLoader__.load({
         'write.recent': '最近的变更记录',
         'write.recentLine': '{time} · {env} · 成功 {ok} / 失败 {failed}',
         'plans.more': '… 其余 {count} 个',
+        'plans.statusRunning': '正在执行，或上次执行中途中断',
+        'plans.statusFailed': '上次执行失败',
+        'plans.statusDone': '已经执行过',
+        'plans.notPending': '只有待确认的计划能执行。先到 .d365/changes 核对执行记录；要重做请丢弃这个计划并重新生成。',
+        'plans.destructive': '高危：会删除或移除元数据',
         'write.publishRunning': '发布中…',
         'write.published': '已发布',
         'write.publishFailed': '发布失败：{error}',
@@ -347,6 +369,141 @@ window.__ModuleLoader__.load({
       }, [])
     }
 
+    /**
+     * The Host puts the actionable half of an error in `hint` (which capability
+     * to grant, where the run record lives). Keeping only `error` left messages
+     * like "计划正在执行" with nothing to do next.
+     */
+    function errorText(data, response) {
+      const error = data?.error ?? `HTTP ${response?.status ?? '?'}`
+      const hint = data?.hint ? String(data.hint) : ''
+      return hint && !String(error).includes(hint) ? `${error} ${hint}` : String(error)
+    }
+
+    function messageOf(cause) {
+      return String(cause?.message ?? cause ?? '')
+    }
+
+    /** A body that is not JSON must not hide the status code. */
+    async function readBody(response) {
+      try {
+        return await response.json()
+      } catch {
+        return {}
+      }
+    }
+
+    function isAbortError(cause) {
+      return cause?.name === 'AbortError'
+    }
+
+    /**
+     * One request at a time per panel. Starting a new request aborts the
+     * previous one, and a response that lands after a newer request started is
+     * ignored: without both, the last response to arrive wins, which is not the
+     * same as the newest request.
+     */
+    function useRequestSequence() {
+      const sequence = React.useRef(0)
+      const active = React.useRef(null)
+      const abortActive = React.useCallback(() => {
+        const controller = active.current
+        active.current = null
+        try {
+          controller?.abort()
+        } catch {
+          // No AbortController: the sequence number alone still rejects the answer.
+        }
+      }, [])
+      const begin = React.useCallback(() => {
+        sequence.current += 1
+        const id = sequence.current
+        abortActive()
+        let controller = null
+        try {
+          if (typeof AbortController === 'function') controller = new AbortController()
+        } catch {
+          controller = null
+        }
+        active.current = controller
+        return {
+          signal: controller?.signal,
+          isCurrent: () => sequence.current === id,
+        }
+      }, [abortActive])
+      React.useEffect(() => () => {
+        // Unmount must not leave a request that will call setState afterwards.
+        sequence.current += 1
+        abortActive()
+      }, [abortActive])
+      return { begin }
+    }
+
+    /**
+     * Every panel stays mounted, so a save in one panel must tell the others to
+     * re-read: the permissions list is keyed by environment, and the keys it
+     * shows are the ones that just changed.
+     */
+    const configListeners = new Set()
+
+    function notifyConfigChanged() {
+      for (const listener of [...configListeners]) {
+        try {
+          listener()
+        } catch {
+          // A panel that cannot refresh must not break the one that saved.
+        }
+      }
+    }
+
+    function useConfigChanged(onChange) {
+      const latest = React.useRef(onChange)
+      React.useEffect(() => {
+        latest.current = onChange
+      }, [onChange])
+      React.useEffect(() => {
+        const listener = () => latest.current?.()
+        configListeners.add(listener)
+        return () => {
+          configListeners.delete(listener)
+        }
+      }, [])
+    }
+
+    const dateFormatters = new Map()
+
+    /** Display time in the viewer's locale and zone; invalid input comes back raw. */
+    function formatTimestamp(value) {
+      if (!value) return ''
+      const date = value instanceof Date ? value : new Date(value)
+      if (Number.isNaN(date.getTime())) return String(value)
+      const locale = currentLocale() === 'zh' ? 'zh-CN' : undefined
+      const cacheKey = locale ?? 'browser'
+      let formatter = dateFormatters.get(cacheKey)
+      if (formatter === undefined) {
+        try {
+          formatter = new Intl.DateTimeFormat(locale, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })
+        } catch {
+          formatter = null
+        }
+        // Remember a failure as `null` so rows do not rebuild (and rethrow) it.
+        dateFormatters.set(cacheKey, formatter)
+      }
+      if (!formatter) return String(value)
+      try {
+        return formatter.format(date)
+      } catch {
+        return String(value)
+      }
+    }
+
     const T = {
       text: 'var(--dsw-alias-label-primary)',
       muted: 'var(--dsw-alias-label-secondary)',
@@ -439,6 +596,22 @@ window.__ModuleLoader__.load({
       return h('div', { style: { fontSize: '12px', color, lineHeight: 1.5 } }, children)
     }
 
+    /** A blocking load failure with the only useful next action next to it. */
+    function LoadError({ text, onRetry }) {
+      return h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+        h(Hint, { kind: 'error' }, text),
+        onRetry ? h('button', { type: 'button', style: buttonStyle(), onClick: onRetry }, t('retry')) : null,
+      )
+    }
+
+    /** A failed refresh while rows are already on screen: keep them, say so. */
+    function RefreshError({ error, onRetry }) {
+      return h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+        h(Hint, { kind: 'error' }, t('refreshFailed', { error })),
+        onRetry ? h('button', { type: 'button', style: { ...buttonStyle(), fontSize: '11px', padding: '2px 8px' }, onClick: onRetry }, t('retry')) : null,
+      )
+    }
+
     /**
      * Row identity for React. It must not derive from the editable key: a card
      * keyed by its own value is a new element on every keystroke, which unmounts
@@ -474,6 +647,21 @@ window.__ModuleLoader__.load({
 
     // ---------------------------------------------------------------- environments
 
+    // Fields whose change makes an earlier connection test stop applying.
+    const CHECK_FIELDS = ['key', 'url', 'cloud', 'tenantId', 'clientId', 'clientSecret', 'clearSecret']
+
+    // The Host only accepts these in a key; anything else is dropped silently
+    // on save, which looked like "the environment just disappeared".
+    const KEY_PATTERN = /^[A-Za-z0-9_-]+$/
+
+    /** Why a row's key cannot be submitted, or null when it is fine. */
+    function keyErrorOf(row) {
+      const key = String(row?.key ?? '').trim()
+      if (!key) return t('keyRequired')
+      if (!KEY_PATTERN.test(key)) return t('keyInvalid', { key })
+      return null
+    }
+
     function EnvironmentsPanel() {
       useLocaleRevision()
       const [loading, setLoading] = React.useState(true)
@@ -484,6 +672,11 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false)
       const [message, setMessage] = React.useState(null)
       const [checks, setChecks] = React.useState({})
+      const [triedSave, setTriedSave] = React.useState(false)
+      const { begin } = useRequestSequence()
+      // One counter per key: a result from an older test, or from before the
+      // credentials were edited, must not come back and claim "connected".
+      const checkRuns = React.useRef(new Map())
 
       const applySettings = React.useCallback((next) => {
         setSettings(next)
@@ -491,27 +684,49 @@ window.__ModuleLoader__.load({
         setDefaultKey(next.defaultEnvironment ?? '')
       }, [])
 
+      const loadConfig = React.useCallback(async () => {
+        const run = begin()
+        setLoading(true)
+        try {
+          const response = await fetch('/api/d365-meta/config', {
+            headers: { accept: 'application/json' },
+            signal: run.signal,
+          })
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
+          if (!run.isCurrent()) return
+          applySettings(data.settings)
+          setError(null)
+        } catch (cause) {
+          if (isAbortError(cause) || !run.isCurrent()) return
+          setError(messageOf(cause))
+        } finally {
+          if (run.isCurrent()) setLoading(false)
+        }
+      }, [applySettings, begin])
+
       React.useEffect(() => {
-        let alive = true
-        ;(async () => {
-          try {
-            const response = await fetch('/api/d365-meta/config', { headers: { accept: 'application/json' } })
-            const data = await response.json().catch(() => ({}))
-            if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
-            if (!alive) return
-            applySettings(data.settings)
-            setError(null)
-          } catch (cause) {
-            if (alive) setError(cause.message)
-          } finally {
-            if (alive) setLoading(false)
-          }
-        })()
-        return () => { alive = false }
-      }, [applySettings])
+        loadConfig()
+      }, [loadConfig])
+
+      const resetCheck = (rowKey) => {
+        checkRuns.current.set(rowKey, (checkRuns.current.get(rowKey) ?? 0) + 1)
+        setChecks((current) => {
+          if (!(rowKey in current)) return current
+          // Keep the slot, drop the verdict: the values it was produced from are
+          // no longer on screen, so "connected" would be a stale claim.
+          return { ...current, [rowKey]: { status: 'stale' } }
+        })
+      }
 
       const update = (index, patch) => {
-        setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+        const row = rows[index]
+        if (row && CHECK_FIELDS.some((field) => field in patch)) {
+          resetCheck(row.key)
+          // A renamed row must not inherit the old key's verdict either.
+          if (typeof patch.key === 'string' && patch.key !== row.key) resetCheck(patch.key)
+        }
+        setRows((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)))
       }
 
       const addRow = () => {
@@ -537,22 +752,33 @@ window.__ModuleLoader__.load({
       }
 
       const save = async () => {
+        setTriedSave(true)
         const keys = new Set()
         for (const row of rows) {
+          // Checked before anything is sent: a bad key used to be accepted by the
+          // form and then dropped by the Host, so the env simply vanished.
+          const keyProblem = keyErrorOf(row)
+          if (keyProblem) {
+            setMessage({ kind: 'error', text: keyProblem })
+            return
+          }
+          const key = row.key.trim()
           if (!row.url.trim()) {
-            setMessage({ kind: 'error', text: t('urlRequired', { key: row.key }) })
+            setMessage({ kind: 'error', text: t('urlRequired', { key }) })
             return
           }
-          if (keys.has(row.key)) {
-            setMessage({ kind: 'error', text: t('duplicate', { key: row.key }) })
+          if (keys.has(key)) {
+            setMessage({ kind: 'error', text: t('duplicate', { key }) })
             return
           }
-          keys.add(row.key)
+          keys.add(key)
         }
 
         const environments = {}
         for (const row of rows) {
-          environments[row.key] = {
+          // Stored under the trimmed key: " dev " and "dev" must not become two
+          // environments, and the Host only matches the exact key.
+          environments[row.key.trim()] = {
             label: row.label,
             url: row.url,
             cloud: row.cloud,
@@ -569,41 +795,57 @@ window.__ModuleLoader__.load({
           }
         }
 
+        // The default may point at a row whose key was just trimmed: send the
+        // key that is actually being saved, or the Host rejects the whole file.
+        const defaultKeyTrimmed = String(defaultKey ?? '').trim()
+        const defaultForSave = environments[defaultKey]
+          ? defaultKey
+          : (environments[defaultKeyTrimmed] ? defaultKeyTrimmed : defaultKey)
+
         setBusy(true)
         setMessage(null)
         try {
           const response = await fetch('/api/d365-meta/config', {
             method: 'POST',
             headers: WRITE_HEADERS,
-            body: JSON.stringify({ defaultEnvironment: defaultKey, environments }),
+            body: JSON.stringify({ defaultEnvironment: defaultForSave, environments }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           applySettings(data.settings)
           setChecks({})
+          // Other mounted panels (permissions) still describe the old env list.
+          notifyConfigChanged()
           setMessage({ kind: 'ok', text: data.secretsTouched?.length ? t('savedSecrets') : t('saved') })
         } catch (cause) {
-          setMessage({ kind: 'error', text: t('saveFailed', { error: cause.message }) })
+          setMessage({ kind: 'error', text: t('saveFailed', { error: messageOf(cause) }) })
         } finally {
           setBusy(false)
         }
       }
 
       const test = async (row) => {
-        setChecks((current) => ({ ...current, [row.key]: { status: 'pending' } }))
+        const key = row.key
+        // Bump the counter before the request: a result that arrives after a
+        // later test, or after the credentials changed, is discarded below.
+        const run = (checkRuns.current.get(key) ?? 0) + 1
+        checkRuns.current.set(key, run)
+        const stillCurrent = () => checkRuns.current.get(key) === run
+        setChecks((current) => ({ ...current, [key]: { status: 'pending' } }))
         try {
           const response = await fetch('/api/d365-meta/check', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ key: row.key }),
+            body: JSON.stringify({ key }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!stillCurrent()) return
+          if (!response.ok) throw new Error(errorText(data, response))
           if (data.ok) {
             const org = data.organization ?? {}
             setChecks((current) => ({
               ...current,
-              [row.key]: { status: 'ok', text: t('checkOk', { name: org.name ?? '—', version: org.version ?? '?' }) },
+              [key]: { status: 'ok', text: t('checkOk', { name: org.name ?? '—', version: org.version ?? '?' }) },
             }))
             return
           }
@@ -612,18 +854,22 @@ window.__ModuleLoader__.load({
             : ''
           setChecks((current) => ({
             ...current,
-            [row.key]: { status: 'fail', text: `${t('checkFail', { error: data.error ?? '?' })}${missing}` },
+            [key]: { status: 'fail', text: `${t('checkFail', { error: data.error ?? '?' })}${missing}` },
           }))
         } catch (cause) {
-          setChecks((current) => ({ ...current, [row.key]: { status: 'fail', text: t('checkFail', { error: cause.message }) } }))
+          if (!stillCurrent()) return
+          setChecks((current) => ({ ...current, [key]: { status: 'fail', text: t('checkFail', { error: messageOf(cause) }) } }))
         }
       }
 
-      if (loading) return h(Hint, null, '…')
-      if (error) return h(Hint, { kind: 'error' }, t('loadFailed', { error }))
+      // Keep the form on screen after a failed load only if it has content; the
+      // first load still shows the full-size placeholder.
+      if (loading && !settings) return h(Hint, null, '…')
+      if (error && !settings) return h(LoadError, { text: t('loadFailed', { error }), onRetry: loadConfig })
 
       const cards = rows.map((row, index) => {
         const check = checks[row.key]
+        const keyProblem = keyErrorOf(row)
         return h('div', {
           key: row.id,
           style: {
@@ -655,6 +901,11 @@ window.__ModuleLoader__.load({
                   onChange: (event) => update(index, { key: event.target.value.trim() }),
                 }),
             ),
+            // Inline, next to the field it is about: the Host drops an unusable
+            // key without a word, so this is the only place the user learns why.
+            keyProblem && !row.existing && (triedSave || row.key.trim() !== '')
+              ? h('div', { style: { fontSize: '11px', color: T.error, marginTop: '2px' } }, keyProblem)
+              : null,
           ),
           h('div', { style: { flex: '1 1 150px', minWidth: 0 } },
             h(Field, { label: t('label') },
@@ -748,6 +999,8 @@ window.__ModuleLoader__.load({
           }, check?.status === 'pending' ? t('testing') : t('test')),
           check?.status === 'ok' ? h('span', { style: { fontSize: '12px', color: T.success } }, check.text) : null,
           check?.status === 'fail' ? h('span', { style: { fontSize: '12px', color: T.error } }, check.text) : null,
+          // The last verdict is kept on purpose: it says "stale", not "still true".
+          check?.status === 'stale' ? h('span', { style: { fontSize: '12px', color: T.warn } }, t('checkStale')) : null,
         ),
         )
       })
@@ -770,6 +1023,8 @@ window.__ModuleLoader__.load({
           settings.issues.map((issue, index) => h('div', { key: index, style: { color: T.muted } }, issue)),
           )
           : null,
+
+        error ? h(RefreshError, { error, onRetry: loadConfig }) : null,
 
         cards.length
           ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } }, cards)
@@ -820,13 +1075,25 @@ window.__ModuleLoader__.load({
       const [saving, setSaving] = React.useState(false)
       const [message, setMessage] = React.useState(null)
       const [copySource, setCopySource] = React.useState('')
+      const { begin } = useRequestSequence()
+      // The click handler reads the newest draft from here: a closure captured at
+      // render time can be one edit behind when a toggle and the click land in
+      // the same frame.
+      const draftRef = React.useRef(draft)
+      React.useEffect(() => {
+        draftRef.current = draft
+      }, [draft])
 
       const load = React.useCallback(async () => {
+        const run = begin()
         try {
-          const response = await fetch('/api/d365-meta/write/policy')
-          const policy = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(policy.error ?? `HTTP ${response.status}`)
-
+          const response = await fetch('/api/d365-meta/write/policy', {
+            headers: { accept: 'application/json' },
+            signal: run.signal,
+          })
+          const policy = await readBody(response)
+          if (!response.ok) throw new Error(errorText(policy, response))
+          if (!run.isCurrent()) return
           const nextDraft = {}
           for (const key of policy.environments ?? []) {
             // An environment with no entry has never been configured: it keeps
@@ -845,18 +1112,26 @@ window.__ModuleLoader__.load({
           setEnvironments(policy.environments ?? [])
           setDraft(nextDraft)
           setSolution(policy.policy?.solutionHint ?? '')
-          setCopySource((current) => current || (policy.environments ?? [])[0] || '')
+          setCopySource((current) => {
+            const list = policy.environments ?? []
+            return list.includes(current) ? current : (list[0] ?? '')
+          })
           setError(null)
         } catch (cause) {
-          setError(cause.message)
+          if (isAbortError(cause) || !run.isCurrent()) return
+          setError(messageOf(cause))
         } finally {
-          setLoading(false)
+          if (run.isCurrent()) setLoading(false)
         }
-      }, [])
+      }, [begin])
 
       React.useEffect(() => {
         load()
       }, [load])
+
+      // The environment list can change on another tab (or in another window):
+      // re-read instead of showing the previous environment's policy.
+      useConfigChanged(load)
 
       const toggle = (envKey, capability) => {
         setDraft((current) => ({
@@ -881,20 +1156,22 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify(payload),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           // Re-read so the boxes show what was stored, not what was clicked.
           await load()
           setMessage({ kind: 'ok', text: t('write.savedPolicy') })
         } catch (cause) {
-          setMessage({ kind: 'error', text: t('write.saveFailed', { error: cause.message }) })
+          setMessage({ kind: 'error', text: t('write.saveFailed', { error: messageOf(cause) }) })
         } finally {
           setSaving(false)
         }
       }
 
-      if (loading) return h(Hint, null, '…')
-      if (error) return h(Hint, { kind: 'error' }, t('write.loadFailed', { error }))
+      if (loading && !environments.length) return h(Hint, null, '…')
+      if (error && !environments.length) {
+        return h(LoadError, { text: t('write.loadFailed', { error }), onRetry: load })
+      }
 
       // Grouping is server-driven: a capability may be added without a client change.
       const groups = {}
@@ -957,6 +1234,8 @@ window.__ModuleLoader__.load({
           h('p', { style: { margin: '2px 0 0', fontSize: '11px', color: T.muted, lineHeight: 1.6 } }, t('write.envNote')),
         ),
 
+        error ? h(RefreshError, { error, onRetry: load }) : null,
+
         environmentBlocks.length
           ? h('div', { style: { display: 'flex', flexDirection: 'column' } }, environmentBlocks)
           : h(Hint, null, t('write.noEnvironments')),
@@ -988,9 +1267,13 @@ window.__ModuleLoader__.load({
             style: buttonStyle('ghost'),
             disabled: !environments.length,
             onClick: () => {
-              const source = draft[copySource] ?? {}
+              // Read at click time, and fall back to the first environment if the
+              // selected one no longer exists — copying `{}` would clear every
+              // capability in every environment.
+              const source = draftRef.current?.[copySource] ?? draftRef.current?.[environments[0]] ?? {}
               const next = {}
               for (const envKey of environments) next[envKey] = { ...source }
+              draftRef.current = next
               setDraft(next)
               setMessage({ kind: 'ok', text: t('write.copied') })
             },
@@ -1017,6 +1300,27 @@ window.__ModuleLoader__.load({
       UpdateViewLayout: '~',
       DeleteOptionValue: '!',
       DeleteAttribute: '!',
+      RemoveActiveCustomizations: '!',
+    }
+
+    // The sidecar records no "destructive" flag, so it has to be derived from
+    // what the plan will do: a removal hidden among updates is still a removal.
+    const DESTRUCTIVE_KINDS = new Set(['optionValue.delete', 'attribute.delete', 'layer.remove'])
+    const DESTRUCTIVE_OPERATIONS = new Set(['DeleteOptionValue', 'DeleteAttribute', 'RemoveActiveCustomizations'])
+
+    function isDestructivePlan(plan) {
+      if (!plan) return false
+      if (plan.destructive === true) return true
+      if (DESTRUCTIVE_KINDS.has(plan.kind)) return true
+      return (plan.operations ?? []).some((operation) => DESTRUCTIVE_OPERATIONS.has(operation?.type))
+    }
+
+    /** Why a plan cannot be executed, or null when it is pending. */
+    function planBlockedText(plan) {
+      if (plan?.status === 'running') return t('plans.statusRunning')
+      if (plan?.status === 'failed') return t('plans.statusFailed')
+      if (plan?.status && plan.status !== 'pending') return t('plans.statusDone')
+      return null
     }
 
     function describeOperation(operation) {
@@ -1031,58 +1335,106 @@ window.__ModuleLoader__.load({
     function PlansPanel({ onCount }) {
       useLocaleRevision()
       const [loading, setLoading] = React.useState(true)
-      const [error, setError] = React.useState(null)
+      const [loadError, setLoadError] = React.useState(null)
+      const [refreshError, setRefreshError] = React.useState(null)
       const [plans, setPlans] = React.useState([])
       const [changes, setChanges] = React.useState([])
       const [publishes, setPublishes] = React.useState({})
       const [message, setMessage] = React.useState(null)
       const [confirming, setConfirming] = React.useState(null)
       const [executing, setExecuting] = React.useState(null)
+      const [cancelling, setCancelling] = React.useState(null)
       const [republishing, setRepublishing] = React.useState(null)
       const [polls, setPolls] = React.useState(0)
+      const [failures, setFailures] = React.useState(0)
+      const { begin } = useRequestSequence()
+      // Read during render to choose between "nothing yet" and "stale rows":
+      // a failed refresh must not erase the list that is already on screen.
+      const loaded = React.useRef(false)
+      // A second click can land before a disabled button repaints; this ref is
+      // the guard that actually prevents the duplicate request.
+      const inFlight = React.useRef({})
 
-      const load = React.useCallback(async () => {
+      const refresh = React.useCallback(async () => {
+        const run = begin()
         try {
-          const response = await fetch('/api/d365-meta/write/plans')
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const response = await fetch('/api/d365-meta/write/plans', {
+            headers: { accept: 'application/json' },
+            signal: run.signal,
+          })
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
+          if (!run.isCurrent()) return null
+          loaded.current = true
           setPlans(data.plans ?? [])
           setChanges(data.changes ?? [])
           setPublishes(data.publishes ?? {})
-          setError(null)
+          setLoadError(null)
+          setRefreshError(null)
+          return true
         } catch (cause) {
-          setError(cause.message)
+          // An abort or a superseded response is not a failure: the request that
+          // replaced it owns the state.
+          if (isAbortError(cause) || !run.isCurrent()) return null
+          if (loaded.current) setRefreshError(messageOf(cause))
+          else setLoadError(messageOf(cause))
+          return false
         } finally {
-          setLoading(false)
+          if (run.isCurrent()) setLoading(false)
         }
-      }, [])
+      }, [begin])
 
       React.useEffect(() => {
-        load()
-      }, [load])
+        refresh()
+      }, [refresh])
 
-      // A publish runs detached, so its outcome appears in the sidecar file
-      // later. Poll while something is still in flight, but never forever: a
-      // request that died with the Host leaves "running" behind for good.
+      // Plans carry the environment they were prepared for; re-read them when
+      // the environment list changes so nothing describes a replaced setup.
+      useConfigChanged(refresh)
+
+      // A publish (and a plan that is executing) finishes detached, so the
+      // outcome only appears in the sidecar later. Keep asking while something
+      // is in flight; a failed request backs off and retries instead of ending
+      // the loop, which is what used to freeze the panel after a host restart.
       const pendingPublish = changes.some((entry) => entry.publishState === 'running' && !publishes[entry.planId])
+      const pendingWork = plans.some((plan) => plan.status === 'running')
+      const shouldPoll = pendingPublish || pendingWork
       React.useEffect(() => {
-        if (!pendingPublish || polls >= 40) return undefined
-        const timer = setTimeout(() => {
+        if (!shouldPoll) return undefined
+        // Slow down rather than stop: past ~40 polls the plan is probably stuck,
+        // but the moment it unwedges is exactly what the person is waiting for.
+        const base = polls > 40 ? 15000 : 3000
+        const delay = failures ? Math.min(15000, 3000 * 2 ** Math.min(failures, 3)) : base
+        let alive = true
+        const timer = setTimeout(async () => {
+          const ok = await refresh()
+          if (!alive) return
           setPolls((value) => value + 1)
-          load()
-        }, 3000)
-        return () => clearTimeout(timer)
-      }, [pendingPublish, polls, load])
+          if (ok === false) setFailures((value) => Math.min(value + 1, 4))
+          else if (ok === true) setFailures(0)
+        }, delay)
+        return () => {
+          alive = false
+          clearTimeout(timer)
+        }
+      }, [shouldPoll, polls, failures, refresh])
 
       React.useEffect(() => {
-        if (!pendingPublish && polls !== 0) setPolls(0)
-      }, [pendingPublish, polls])
+        if (!shouldPoll && (polls !== 0 || failures !== 0)) {
+          setPolls(0)
+          setFailures(0)
+        }
+      }, [shouldPoll, polls, failures])
 
       React.useEffect(() => {
         onCount?.(plans.length)
       }, [plans.length, onCount])
 
       const cancelPlan = async (planId) => {
+        if (inFlight.current.cancel) return
+        inFlight.current.cancel = planId
+        setCancelling(planId)
+        setMessage(null)
         try {
           const response = await fetch('/api/d365-meta/write/cancel', {
             method: 'POST',
@@ -1091,16 +1443,21 @@ window.__ModuleLoader__.load({
           })
           // A 403/404/500 here used to look like success: the list refreshed,
           // the plan was still there, and the person believed it was gone.
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           setConfirming(null)
-          await load()
+          await refresh()
         } catch (cause) {
-          setMessage({ kind: 'error', text: String(cause.message) })
+          setMessage({ kind: 'error', text: messageOf(cause) })
+        } finally {
+          inFlight.current.cancel = null
+          setCancelling(null)
         }
       }
 
       const executePlan = async (planId) => {
+        if (inFlight.current.execute) return
+        inFlight.current.execute = planId
         setExecuting(planId)
         setMessage(null)
         try {
@@ -1109,22 +1466,27 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify({ planId }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           const ok = data.results?.length ?? 0
           const failed = data.failures?.length ?? 0
           const publish = data.publishState === 'running' ? t('write.publishing') : ''
           setMessage({ kind: failed ? 'error' : 'ok', text: t('write.executed', { ok, failed }) + publish })
           setConfirming(null)
-          await load()
         } catch (cause) {
-          setMessage({ kind: 'error', text: cause.message })
+          setMessage({ kind: 'error', text: messageOf(cause) })
         } finally {
+          inFlight.current.execute = null
           setExecuting(null)
+          // The server changes the plan either way (executed, refused as not
+          // pending, or gone), so the list is re-read after success or failure.
+          await refresh()
         }
       }
 
       const republish = async (planId) => {
+        if (inFlight.current.publish) return
+        inFlight.current.publish = planId
         setRepublishing(planId)
         setMessage(null)
         try {
@@ -1133,16 +1495,17 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify({ planId }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           const publish = data.publish ?? {}
           setMessage(publish.ok
             ? { kind: 'ok', text: t('write.republishOk', { targets: targetsText(publish.targets) }) }
             : { kind: 'error', text: t('write.republishFailed', { error: publish.error ?? '' }) })
-          await load()
+          await refresh()
         } catch (cause) {
-          setMessage({ kind: 'error', text: String(cause.message) })
+          setMessage({ kind: 'error', text: messageOf(cause) })
         } finally {
+          inFlight.current.publish = null
           setRepublishing(null)
         }
       }
@@ -1161,15 +1524,22 @@ window.__ModuleLoader__.load({
         return { kind: 'muted', text: t('write.publishSkipped') }
       }
 
-      if (loading) return h(Hint, null, '…')
-      if (error) return h(Hint, { kind: 'error' }, t('write.loadFailed', { error }))
+      if (loading && !loaded.current) return h(Hint, null, '…')
+      if (loadError && !loaded.current) {
+        return h(LoadError, { text: t('write.loadFailed', { error: loadError }), onRetry: refresh })
+      }
 
       const planCards = plans.map((plan) => {
         const isConfirming = confirming === plan.id
+        const isPending = plan.status === 'pending'
+        const destructive = isDestructivePlan(plan)
+        const blocked = planBlockedText(plan)
+        const isCancelling = cancelling === plan.id
+        const executingAny = executing !== null
         return h('div', {
           key: plan.id,
           style: {
-            border: `1px solid ${isConfirming ? T.error : T.border}`,
+            border: `1px solid ${isConfirming || destructive ? T.error : T.border}`,
             borderRadius: '8px',
             padding: '10px 12px',
             display: 'flex',
@@ -1180,8 +1550,14 @@ window.__ModuleLoader__.load({
         },
         h('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
           h('strong', { style: { fontSize: '13px', color: T.text } }, plan.title ?? plan.kind),
-          h('span', { style: { fontSize: '11px', color: T.muted } }, `${plan.envKey} · ${plan.createdAt ?? ''}`),
+          // Raw value in the tooltip: the display time is converted to the
+          // viewer's zone, so the original stamp must stay reachable.
+          h('span', { style: { fontSize: '11px', color: T.muted }, title: plan.createdAt ?? '' },
+            `${plan.envKey} · ${formatTimestamp(plan.createdAt)}`),
         ),
+        destructive
+          ? h('div', { style: { fontSize: '11px', color: T.error, fontWeight: 600 } }, t('plans.destructive'))
+          : null,
         h('div', { style: { fontSize: '12px', color: T.muted, fontFamily: 'ui-monospace, monospace', lineHeight: 1.5, maxHeight: '140px', overflow: 'auto' } },
           (plan.operations ?? []).slice(0, 12).map((operation, index) => h('div', { key: index }, describeOperation(operation))),
           (plan.operations ?? []).length > 12
@@ -1192,7 +1568,16 @@ window.__ModuleLoader__.load({
           ? h('div', { style: { fontSize: '11px', color: T.muted } }, t('write.skipped', { count: plan.skipped.length }))
           : null,
 
-        isConfirming
+        // Only a pending plan can be executed; the Host refuses anything else.
+        // Say why instead of offering a button that cannot work.
+        blocked
+          ? h('div', { style: { fontSize: '12px', color: T.warn, lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: '2px' } },
+            h('span', { style: { fontWeight: 600 } }, blocked),
+            h('span', { style: { color: T.muted } }, t('plans.notPending')),
+          )
+          : null,
+
+        isConfirming && isPending
           ? h('div', {
             style: {
               border: `1px solid ${T.error}`,
@@ -1207,26 +1592,39 @@ window.__ModuleLoader__.load({
           },
           h('strong', { style: { color: T.error } }, t('write.warningTitle')),
           h('span', null, t('write.warningBody', { env: plan.envKey })),
-          plan.kind === 'attribute.delete' || plan.kind === 'optionValue.delete'
-            ? h('span', { style: { color: T.error } }, t('write.destructiveBody'))
-            : null,
+          destructive ? h('span', { style: { color: T.error } }, t('write.destructiveBody')) : null,
           h('div', { style: { display: 'flex', gap: '8px' } },
             h('button', {
               type: 'button',
               style: { ...buttonStyle('primary'), background: T.error, borderColor: T.error },
-              disabled: executing === plan.id,
+              disabled: executingAny,
               onClick: () => executePlan(plan.id),
             }, executing === plan.id ? t('write.executing') : t('write.confirmExecute')),
-            h('button', { type: 'button', style: buttonStyle(), onClick: () => setConfirming(null) }, t('write.back')),
+            h('button', {
+              type: 'button',
+              style: buttonStyle(),
+              disabled: executingAny,
+              onClick: () => setConfirming(null),
+            }, t('write.back')),
           ),
           )
           : h('div', { style: { display: 'flex', gap: '8px' } },
+            isPending
+              ? h('button', {
+                type: 'button',
+                style: buttonStyle('primary'),
+                disabled: executingAny || isCancelling,
+                onClick: () => setConfirming(plan.id),
+              }, t('write.execute'))
+              : null,
             h('button', {
               type: 'button',
-              style: buttonStyle('primary'),
-              onClick: () => setConfirming(plan.id),
-            }, t('write.execute')),
-            h('button', { type: 'button', style: buttonStyle('danger'), onClick: () => cancelPlan(plan.id) }, t('write.cancelPlan')),
+              style: buttonStyle('danger'),
+              // Discarding another plan while one executes is allowed; discarding
+              // this one while its own request is in flight is not.
+              disabled: isCancelling || executing === plan.id,
+              onClick: () => cancelPlan(plan.id),
+            }, isCancelling ? t('write.cancelling') : t('write.cancelPlan')),
           ),
         )
       })
@@ -1236,6 +1634,10 @@ window.__ModuleLoader__.load({
           h('h3', { style: { margin: 0, fontSize: '14px', color: T.text } }, t('write.plans')),
           h('p', { style: { margin: '4px 0 0', fontSize: '12px', color: T.muted, lineHeight: 1.5 } }, t('write.plansDesc')),
         ),
+
+        refreshError
+          ? h(RefreshError, { error: refreshError, onRetry: refresh })
+          : null,
 
         message ? h(Hint, { kind: message.kind }, message.text) : null,
 
@@ -1253,8 +1655,8 @@ window.__ModuleLoader__.load({
                 style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
               },
               h('span', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
-                h('span', null, t('write.recentLine', {
-                  time: entry.recordedAt ?? '',
+                h('span', { title: entry.recordedAt ?? '' }, t('write.recentLine', {
+                  time: formatTimestamp(entry.recordedAt),
                   env: entry.envKey ?? '',
                   ok: entry.applied?.length ?? 0,
                   failed: entry.failed?.length ?? 0,
@@ -1298,8 +1700,8 @@ window.__ModuleLoader__.load({
         ;(async () => {
           try {
             const response = await fetch('/api/d365-meta/config', { headers: { accept: 'application/json' } })
-            const data = await response.json().catch(() => ({}))
-            if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+            const data = await readBody(response)
+            if (!response.ok) throw new Error(errorText(data, response))
             if (!alive) return
             const next = data.settings?.general ?? {}
             setGeneral(next)
@@ -1310,7 +1712,7 @@ window.__ModuleLoader__.load({
             })
             setError(null)
           } catch (cause) {
-            if (alive) setError(cause.message)
+            if (alive) setError(messageOf(cause))
           } finally {
             if (alive) setLoading(false)
           }
@@ -1335,13 +1737,13 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify({ general: generalPayload }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           const next = data.settings?.general ?? general
           setGeneral(next)
           setMessage({ kind: 'ok', text: t('general.saved') })
         } catch (cause) {
-          setMessage({ kind: 'error', text: t('write.saveFailed', { error: cause.message }) })
+          setMessage({ kind: 'error', text: t('write.saveFailed', { error: messageOf(cause) }) })
         } finally {
           setBusy(false)
         }
@@ -1407,8 +1809,8 @@ window.__ModuleLoader__.load({
         ;(async () => {
           try {
             const response = await fetch('/api/d365-meta/config', { headers: { accept: 'application/json' } })
-            const data = await response.json().catch(() => ({}))
-            if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+            const data = await readBody(response)
+            if (!response.ok) throw new Error(errorText(data, response))
             if (!alive) return
             const next = data.settings?.gitlab ?? {}
             setGitlab(next)
@@ -1419,7 +1821,7 @@ window.__ModuleLoader__.load({
             })
             setError(null)
           } catch (cause) {
-            if (alive) setError(cause.message)
+            if (alive) setError(messageOf(cause))
           } finally {
             if (alive) setLoading(false)
           }
@@ -1444,14 +1846,14 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify({ gitlab: payload }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           const next = data.settings?.gitlab ?? gitlab
           setGitlab(next)
           setForm((current) => ({ ...current, token: '' }))
           setMessage({ kind: 'ok', text: extra?.clearToken ? t('gitlab.cleared') : t('gitlab.saved') })
         } catch (cause) {
-          setMessage({ kind: 'error', text: t('write.saveFailed', { error: cause.message }) })
+          setMessage({ kind: 'error', text: t('write.saveFailed', { error: messageOf(cause) }) })
         } finally {
           setBusy(false)
         }
@@ -1466,12 +1868,12 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify({ url: form.url.trim() }),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           if (!data.ok) throw new Error([data.error, data.hint].filter(Boolean).join(' '))
           setMessage({ kind: 'ok', text: t('gitlab.ok', { user: data.user ?? data.name ?? '' }) })
         } catch (cause) {
-          setMessage({ kind: 'error', text: cause.message })
+          setMessage({ kind: 'error', text: messageOf(cause) })
         } finally {
           setChecking(false)
         }
@@ -1558,8 +1960,8 @@ window.__ModuleLoader__.load({
 
       const load = React.useCallback(async () => {
         const response = await fetch('/api/d365-meta/storage', { headers: { accept: 'application/json' } })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+        const data = await readBody(response)
+        if (!response.ok) throw new Error(errorText(data, response))
         return data.storage
       }, [])
 
@@ -1573,7 +1975,7 @@ window.__ModuleLoader__.load({
               setError(null)
             }
           } catch (cause) {
-            if (alive) setError(cause.message)
+            if (alive) setError(messageOf(cause))
           } finally {
             if (alive) setLoading(false)
           }
@@ -1590,12 +1992,12 @@ window.__ModuleLoader__.load({
             headers: WRITE_HEADERS,
             body: JSON.stringify(body ?? {}),
           })
-          const data = await response.json().catch(() => ({}))
-          if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`)
+          const data = await readBody(response)
+          if (!response.ok) throw new Error(errorText(data, response))
           if (data.storage) setStorage(data.storage)
           return data
         } catch (cause) {
-          setMessage({ kind: 'error', text: t('data.failed', { error: cause.message }) })
+          setMessage({ kind: 'error', text: t('data.failed', { error: messageOf(cause) }) })
           return null
         } finally {
           setBusy(false)

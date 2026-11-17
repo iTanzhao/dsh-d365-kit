@@ -193,7 +193,7 @@ attributes.json   # 仅 includeAttributes 时
 
 manifest 是区分「环境里没有」与「没采到」的唯一依据。全量快照约 125 MB、三分钟；默认每环境留 2 份。
 
-同步结束后会自动按保留策略清理，并压缩成单行 JSON。
+同步结束后会自动按保留策略清理，并压缩成单行 JSON；显式给了 `keep` 时按它保留，不再叠加保留策略的份数。
 
 ---
 
@@ -214,7 +214,9 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 时间后缀可简写：`sit@082604` 会匹配 `20261102T082604Z`。
 
-噪声治理：忽略时间戳与所有 `*id` 列（`NOISE_FIELDS`），默认跳过 `organization`（环境身份）。报告在 `.d365/diffs/`；快照超过 24 小时会在报告里提示先重新同步。
+噪声治理：忽略时间戳与所有 `*id` 列（`NOISE_FIELDS`），默认跳过 `organization`（环境身份）。行按身份键对齐（`name` 加作用域列：表单是 `objecttypecode`，视图是 `returnedtypecode`，其余是 `primaryentity`），所以两个同名的表单是两行，不是一行。报告在 `.d365/diffs/`；快照超过 24 小时会在报告里提示先重新同步。
+
+只在一侧出现的行，只有在另一侧**完整**时才记为新增 / 删除。同步撞到行数上限、某个表读取失败或快照读不出来时，该行列为 `未确认` / `?` 并写明原因——「没取到」和「环境里没有」是两个答案。
 
 `solution_components` 例外：组件的 `objectid` 是按组织分配的 GUID，逐行对齐跨环境只会得到「全部新增 + 全部删除」。这个资源改为按 `componenttype` **计数**比较（`~ componenttype 1：数量 11469→10754`），报告里会写明。要定位具体哪个组件，用 `d365_migrate` 或 `d365_layers`。
 
@@ -263,7 +265,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 | `select` | string | `sample` / `query` 返回的列，逗号分隔；`query` 省略则取行本身带的列 |
 | `orderby` | string | `query` 的排序，例如 `modifiedon desc` |
 | `expand` | string | `query` 的 `$expand`，例如 `primarycontactid($select=fullname)` |
-| `id` | string | `query`：按主键取一条（GUID，或带引号的备用键值如 `'contoso_001'`） |
+| `id` | string | `query`：按主键取一条（GUID，或写成 `字段='值'` 的备用键，如 `contoso_code='001'`） |
 | `top` | integer | `sample` 行数（默认 5，最多 100）；`group` 返回前 N 组（默认 20）；`query` 返回行数（默认 25，最多 500） |
 | `environment` / `environments` / `allEnvironments` | | 环境选择 |
 
@@ -330,7 +332,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 迁移前先定三件事（预演结果里会逐条列出，要改就重新 `plan`）：
 
-1. **迁移条件**：`since`（时间窗口；`mode=new` 按 createdon、`mode=modified` 按 modifiedon）、`filter`（OData `$filter`）、`ids`、`fetchXml` 任选；都不给就是**整表**（默认全部）。整表且数据量大时，预演会在「需要注意」里建议用 `since` / `filter` 缩小范围，并用 `maxRecords` 限制本次读多少条。
+1. **迁移条件**：`since`（时间窗口；`mode=new` 按 createdon、`mode=modified` 按 modifiedon；不带时区的写法按本地时间解释）、`filter`（OData `$filter`）、`ids`、`fetchXml` 任选；都不给就是**整表**（默认全部）。整表且数据量大时，预演会在「需要注意」里建议用 `since` / `filter` 缩小范围，并用 `maxRecords` 限制本次读多少条。
 2. **迁移字段**：`fields` 不给就是**全部可写字段**。字段清单里**含主键**（`xxxid`）就等于保持 GUID 一致；**不含主键**时目标重新分配 GUID。（也可以用 `keepGuid` 显式覆盖。）
 3. **Bypass 自定义插件**：默认**跳过**（`bypassPlugins: true`，写请求带 `MSCRM.BypassCustomPluginExecution`，目标环境的同步插件不跑，避免触发下游通知/集成）。要照常跑插件就传 `bypassPlugins: false`。
 
@@ -590,7 +592,7 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 { "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
 ```
 
-**权限按方法分**：`GET` function 是读，走「读取业务数据」（`data.read`）；`POST` action 走「调用消息」（`message.invoke`，默认关闭）。POST 每次都在对话里弹确认卡，写明环境、路径、请求体；**调用失败不抛异常**，而是把 HTTP 状态、错误码和响应体原样返回——那正是复现问题时最需要的部分。
+**权限按方法分**：`GET` function 是读，走「读取业务数据」（`data.read`）；`POST` action 需要「调用消息」（`message.invoke`，默认关闭）**和**「修改业务数据」（`data.write`）——消息由目标环境的插件实现，可能写数据。POST 每次都在对话里弹确认卡，写明环境、路径、请求体；**调用失败不抛异常**，而是把 HTTP 状态、错误码和响应体原样返回——那正是复现问题时最需要的部分。
 
 ---
 

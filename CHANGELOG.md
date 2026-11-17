@@ -4,6 +4,42 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
 
+## 0.36.1
+
+A review of the whole kit, read tool by tool. Three patterns repeat: a write could run without being the plan that was approved, a partial answer could look like a complete one, and a truncation could be read as a fact.
+
+**Writes**
+- **A plan executes once, and only if it is still the plan that was approved.** `d365_write` (and the settings page) now claim the plan with an exclusive lock file before the first call, re-read it from disk, and refuse unless it is still `pending`, still points at the same environment URL, and its operations still pass the capability check — derived from the operation types, not from the `capability` field the plan file carries. Cancelling a plan from the settings page while its card is open now does nothing on approval; before, the card ran the operations it still remembered.
+- **The ledger says what was about to happen, not only what happened.** The intent row is written before the first write and the same file is rewritten with the outcome, so a crash mid-plan leaves a `running` row instead of nothing.
+- **`d365_access` can execute at all.** It read the permission policy from the config object, so the lookup silently fell back to the defaults and "Security role" always read as *not granted*. A plan that partly failed is also kept now, instead of being deleted with its failures.
+- Security-role plans run only from their own card: the settings page refuses them (the card is where the role, the principal and the privileges are written out), and `d365_write` refuses to dispatch role operations.
+- Approval cards sanitize operation summaries — a label containing newlines could otherwise add lines that looked like extra operations.
+- The settings-page write header is described for what it is: a cross-site guard. A local program running as the same user can send it, and the docs no longer claim it proves a person clicked; the plan file, the lock and the execution-time permission check are what constrain a write.
+
+**"Not checked" is no longer reported as "fine"**
+- `d365_diff`: a row is added/removed only when the other side was **complete** for that resource. Truncated snapshots, per-entity failures and unreadable files now produce `未确认` rows with the reason, and rows are matched on `name` plus the scope column (`objecttypecode` for forms, `returnedtypecode` for views, `primaryentity` elsewhere) — two forms with the same name used to collapse into one row.
+- `d365_sync`: an explicit `keep` is honored (the retention policy used to re-trim to `snapshotKeep`, silently discarding snapshots the call was asked to keep); attribute pages read `hasMore`, so a capped attribute list is marked; per-table resources are fetched per table instead of building `LogicalName='undefined'`; the manifest lists only files that were written.
+- `d365_migrate`: the verdict is `无法下结论` when any component could not be checked (unmapped layer type, missing name, failed probe), with a `未能核对的组件` section naming them. `d365_code_check`: a C# diff without a class declaration is no longer silently skipped, steps are matched with their message and table (the `$select` fallback used to drop both), attribute lookups that fail count as "unknown → confirm by hand" rather than "missing", assembly versions compare numerically, `+++i;` is no longer eaten as a diff header, `<formLibraries>` is read as a binding, and a diff that could not be downloaded is listed as unverified rather than as "no metadata problems".
+- Contract drift compares steps per message, stage, mode **and table**; a missing table is no longer satisfied by any table's step.
+
+**Data migration**
+- **Lookups that point at rows the same plan creates are written after the batch**, not reported as "missing" and blocked. References that still cannot be resolved fail their row instead of writing a half-bound record.
+- A `fetchXml` plan derives its columns from the fetch (it used to write only what happened to be in the fetch), and a row without its primary id fails loudly (`missing-id`) instead of producing `accountid eq undefined`.
+- Write totals no longer go negative; a `since` without an offset means local time (and says so); owner mapping looks teams up by name, using email only when the value looks like an address; a record id must be a GUID or `字段='值'` — a bare quoted alternate key is rejected.
+
+**Fewer silent truncations**
+- `d365_trace`: redaction also covers SQL `Password=`, `<Password>` and bare `key=value`, and the output says `样本 N / 共 M` instead of presenting the sample as the window.
+- `d365_health`: the failure list pages up to 500 and the indicator shows `10+`; `d365_reports view` streams artifacts larger than 8 MiB instead of parsing a 1 GB JSON into memory.
+- Cleanup deletes the `.json` and `.md` of a report together (it deleted one and orphaned the other), and snapshot directories without a readable manifest are pruned after a 10-minute grace period; `d365_perf` only reads a clock stamp at the start of a line; `d365_flows` understands the bare-definition `clientdata` shape.
+- Artifacts written in the same millisecond no longer overwrite each other.
+- Settings: an environment URL must be an origin (no `/main.aspx?appid=…`, no `/api/data/v9.2`, no query string), saves are serialized through one lock so two tabs cannot drop each other's environments, and the secrets file is created with mode `0600` rather than chmod'ed afterwards.
+
+**Permissions and UI**
+- `d365_invoke` validates the message, entity set, record id and GET parameter names; a POST now needs `message.invoke` **and** `data.write` (a `message.invoke` grant used to replace the data-write floor for any POST).
+- Settings page: errors show the hint that came with them, a failed poll backs off instead of stopping, only `pending` plans offer Execute, deletions and layer removals are marked unrecoverable, timestamps are formatted, every environment key is validated before saving, and Discard cannot be clicked twice.
+
+Behavior changes worth noting: `d365_data id` no longer accepts a bare quoted alternate key (`'contoso_001'`); `d365_sync keep` overrides the retention count; `d365_diff` rows can now be `未确认`; security-role plans execute only from the chat card.
+
 ## 0.36.0
 
 New `d365_perf` and `d365_trace action=stages`: troubleshooting grows from "what is the structure" to "where did the time go". Tool count 20 → 21.
