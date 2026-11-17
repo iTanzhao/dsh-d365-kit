@@ -20,7 +20,7 @@
 ### 方式一：从 npm 安装（最短）
 
 ```bash
-plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.37.0"
 ```
 
 前提是包已经发到 pnpm 配置的 registry——公网 npm 或内网镜像都行。包名没有 scope，不需要配 scope 映射。要装指定版本就写 `dsh-d365-kit@<版本>`。
@@ -30,7 +30,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
 ### 方式二：从 Git 安装（不需要 registry）
 
 ```bash
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.37.0"
 ```
 
 DSH 用 pnpm 从 git 拉包。装完确认：
@@ -117,18 +117,18 @@ Host 侧工具在安装时就能用；**设置页**属于 Web 客户端插件，
 ## 验证
 
 ```
-d365_envs check=true
+d365_envs action=check
 d365_metadata resource=entities top=3
 ```
 
-两次都有内容就通了。第一次 `d365_sync` 会拉全量元数据（真实环境约 125 MB、三分钟），不想占盘可以跳过，用 `d365_metadata` 按需查。
+两次都有内容就通了。第一次 `d365_snapshot` 会拉全量元数据（真实环境约 125 MB、三分钟），不想占盘可以跳过，用 `d365_metadata` 按需查。
 
 ## 升级
 
 ```bash
 # 从 Git 安装的
 plugin_manager remove_bundle target=dsh-d365-kit
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.37.0"
 ```
 
 改版本号后必须**先 remove 再 install**：link/pnpm 认为包已存在时会返回 `already-installed`，不会替换代码。

@@ -59,7 +59,7 @@ The decision lives in one place, `lib/client.js`, so a new tool cannot bypass it
 
 - **Metadata read**: the entity set name in the request URL is on the metadata allowlist (`EntityDefinitions`, `systemforms`, `savedqueries`, `webresourceset`, `solutions`, `msdyn_componentlayers`…) and requires `metadata.read`; it fails with `metadata-read-forbidden`;
 - **Business-data read**: every other `GET` is blocked as business data and requires `data.read`; it fails with `data-read-forbidden`;
-- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`. A `d365_invoke` `POST` needs `message.invoke` (failing as `message-invoke-forbidden`) **and** `data.write` (its plug-ins may change data), while its `GET` function is still a read and needs `data.read`. A `d365_access` write (`Associate`, `AddPrivilegesRole`, `RemovePrivilegeRole`) goes through `role.admin` (failing as `role-admin-forbidden`), while its four read actions still need `data.read`.
+- **Write**: a request that is not `GET` and does not belong to a metadata message (`PublishXml`, `InsertOptionValue`, `CreateAttribute`, `RemoveActiveCustomizations`…) must have `data.write` first, otherwise it fails with `data-write-forbidden`. A `d365_invoke` `POST` needs `message.invoke` (failing as `message-invoke-forbidden`) **and** `data.write` (its plug-ins may change data), while its `GET` function is still a read and needs `data.read`. A `d365_roles` write (`Associate`, `AddPrivilegesRole`, `RemovePrivilegeRole`) goes through `role.admin` (failing as `role-admin-forbidden`), while its four read actions still need `data.read`.
 
 Every gate fires **before a token is acquired**, so the request never reaches the environment. Decisions are cached per environment for 2 seconds, so a change in the settings page applies to the next tool call.
 
@@ -88,7 +88,7 @@ Local option sets (an option set carried by a field) are addressed with `entity`
 Run mw04aul6-1ci6aa
 ```
 
-The agent calls `d365_write action=execute planId=...`, which:
+The agent calls `d365_metadata_write action=execute planId=...`, which:
 
 1. Reads the plan and checks that its status is `pending`;
 2. Checks that the environment **still** holds this capability;
@@ -96,7 +96,7 @@ The agent calls `d365_write action=execute planId=...`, which:
 4. Shows a confirmation card: environment, targets, operation count, the first 10 operations; with deletions it adds an unrecoverable warning;
 5. Click "Execute now" → operations are written one by one → publish runs in the background → the run is audited.
 
-You can also review and execute metadata plans from the Pending changes tab in the settings page (the same second, red confirmation). Both entry points share the same checks. Security-role plans (`d365_access`) run only from their own card in the conversation: the page refuses them with "安全角色计划只能在 d365_access 的对话里执行", because the card is where the role, the principal and the privileges are spelled out.
+You can also review and execute metadata plans from the Pending changes tab in the settings page (the same second, red confirmation). Both entry points share the same checks. Security-role plans (`d365_roles`) run only from their own card in the conversation: the page refuses them with "安全角色计划只能在 d365_roles 的对话里执行", because the card is where the role, the principal and the privileges are spelled out.
 
 ### Plan states
 

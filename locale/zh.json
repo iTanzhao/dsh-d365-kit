@@ -16,7 +16,7 @@
       "title": "解决方案层",
       "description": "查看组件被哪些解决方案覆盖、当前生效的是哪一层"
     },
-    "d365_sync": {
+    "d365_snapshot": {
       "title": "同步快照",
       "description": "把环境元数据拉成本地快照并记录采集完整度"
     },
@@ -28,7 +28,7 @@
       "title": "环境配置",
       "description": "读写环境清单：列出、保存、删除或测试连接"
     },
-    "d365_write": {
+    "d365_metadata_write": {
       "title": "元数据变更",
       "description": "准备选项值、字段、表名与视图列的修改计划，确认后执行"
     },

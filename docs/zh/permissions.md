@@ -59,7 +59,7 @@
 
 - **元数据读**：URL 的实体集名在元数据白名单（`EntityDefinitions`、`systemforms`、`savedqueries`、`webresourceset`、`solutions`、`msdyn_componentlayers`…）里，要求 `metadata.read`，报 `metadata-read-forbidden`；
 - **业务数据读**：其余 `GET` 一律按业务数据拦截，要求 `data.read`，报 `data-read-forbidden`；
-- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`；`d365_invoke` 的 `POST` 需要 `message.invoke`（被拒绝时 `message-invoke-forbidden`）**和** `data.write`（它的插件可能改数据），它的 `GET` function 仍是读，走 `data.read`；`d365_access` 的写入（`Associate`、`AddPrivilegesRole`、`RemovePrivilegeRole`）走 `role.admin`（被拒绝时 `role-admin-forbidden`），它的四个读动作仍走 `data.read`；
+- **写**：非 `GET` 且不属于元数据消息（`PublishXml`、`InsertOptionValue`、`CreateAttribute`、`RemoveActiveCustomizations`…）的请求，先要求 `data.write`，否则报 `data-write-forbidden`；`d365_invoke` 的 `POST` 需要 `message.invoke`（被拒绝时 `message-invoke-forbidden`）**和** `data.write`（它的插件可能改数据），它的 `GET` function 仍是读，走 `data.read`；`d365_roles` 的写入（`Associate`、`AddPrivilegesRole`、`RemovePrivilegeRole`）走 `role.admin`（被拒绝时 `role-admin-forbidden`），它的四个读动作仍走 `data.read`；
 
 拦截都发生在**取令牌之前**，不会把请求发到环境里。判定结果按环境缓存 2 秒，设置页改了权限后下一次工具调用就生效。
 
@@ -88,7 +88,7 @@
 执行 mw04aul6-1ci6aa
 ```
 
-agent 调 `d365_write action=execute planId=...`，会：
+agent 调 `d365_metadata_write action=execute planId=...`，会：
 
 1. 读计划，检查状态必须是 `pending`；
 2. 检查该环境**现在**仍持有这项能力；
@@ -96,7 +96,7 @@ agent 调 `d365_write action=execute planId=...`，会：
 4. 弹确认卡片：环境、目标、操作条数、前 10 条操作；含删除时额外提示不可恢复；
 5. 点「批准执行」→ 逐条写入 → 后台发布 → 记审计。
 
-也可以到设置页「计划」标签里审阅并执行**元数据**计划（同样的二次红色确认）。两条入口共用同一套校验。安全角色计划（`d365_access`）只在对话里那张卡片上执行：设置页会拒绝并提示「安全角色计划只能在 d365_access 的对话里执行」——角色、对象与权限是在卡片上写清的。
+也可以到设置页「计划」标签里审阅并执行**元数据**计划（同样的二次红色确认）。两条入口共用同一套校验。安全角色计划（`d365_roles`）只在对话里那张卡片上执行：设置页会拒绝并提示「安全角色计划只能在 d365_roles 的对话里执行」——角色、对象与权限是在卡片上写清的。
 
 ### 计划状态
 

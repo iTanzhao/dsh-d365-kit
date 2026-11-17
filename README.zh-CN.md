@@ -5,7 +5,7 @@
 Dynamics 365 CE / Dataverse 的**开发与部署助手**，作为 [DeepSeek Harness](https://github.com/deepseek-ai) 的 bundle 安装。
 它把一个真实的 D365 组织变成 agent 能直接查的东西：元数据、解决方案层、快照差异、引用关系、迁移风险、代码改动的影响面，以及受控的写入。
 
-> 二十一个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
+> 十八个工具、一个设置页。默认只读：勾选什么就只做什么，元数据也由「读取元数据」这一项控制（默认开启）。
 
 ```
 你：DEV 的 account 上 contoso_customertier 这个字段，现在还有哪些表单和视图在用它？
@@ -25,8 +25,8 @@ D365 项目的日常摩擦，大多不是"不会写代码"，而是**环境之�
 | 删这个字段会不会出事？ | `d365_refs` 反查表单 / 视图 / 流程 / 插件步骤，`d365_data` 看还有多少条记录在用 |
 | 这个 MR 发布到 UAT 能跑起来吗？ | `d365_code_check` 把 JS 映射到 Web 资源与表单、把 C# 映射到程序集/类型/步骤/镜像 |
 | 上游改了插件，下游跟上了吗？ | `d365_contract` 把上游注册当契约，逐条比对下游，带豁免与趋势 |
-| 现在能发布吗？ | `d365_health` 看挂起的导入/发布与失败作业，写入前的预检查用的是同一份数据 |
-| 补一个字段 / 选项值 / 视图列？ | `d365_write` 生成计划 → 人在对话里确认 → 才写入，事后可查审计 |
+| 现在能发布吗？ | `d365_diagnose` 的 `action: health` 看挂起的导入/发布与失败作业，写入前的预检查用的是同一份数据 |
+| 补一个字段 / 选项值 / 视图列？ | `d365_metadata_write` 生成计划 → 人在对话里确认 → 才写入，事后可查审计 |
 
 ---
 
@@ -36,22 +36,20 @@ D365 项目的日常摩擦，大多不是"不会写代码"，而是**环境之�
 
 | 工具 | 用途 |
 | --- | --- |
-| `d365_envs` | 环境清单、凭据是否齐全；`check: true` 时真实连一次 |
-| `d365_configure` | 增删改环境（URL、租户、ClientId、密钥）、测连通性 |
-| `d365_health` | 挂起/失败的后台作业、正在进行的导入发布、最近安装的解决方案 |
+| `d365_envs` | 环境清单只此一处：`action: list` 看有哪些环境、凭据是否齐全，`check` 真实连一次，`save` / `remove` 增删改 URL、租户、ClientId、密钥与默认环境 |
 
 ### 元数据与解决方案层
 
 | 工具 | 用途 |
 | --- | --- |
-| `d365_metadata` | 19 类资源：实体、字段、关系、表单、视图、工作流、业务规则、插件、Web 资源、解决方案、组件、Custom API、站点地图、选项集 |
+| `d365_metadata` | 20 类资源：实体、字段、关系、表单、视图、工作流、业务规则、插件、Web 资源、解决方案、组件、Custom API、站点地图、选项集 |
 | `d365_layers` | `msdyn_componentlayer`：某组件被哪些解决方案覆盖过、谁在最上层、当前生效的是哪一层 |
 
 ### 快照与对比
 
 | 工具 | 用途 |
 | --- | --- |
-| `d365_sync` | 把环境的元数据拉成本地快照，逐资源记录「完整 / 被截断 / 失败」 |
+| `d365_snapshot` | 把环境的元数据拉成本地快照，逐资源记录「完整 / 被截断 / 失败」 |
 | `d365_diff` | 两份快照的字段级差异（新增、删除、修改），带噪声过滤与快照过期提示 |
 
 ### 影响面与数据
@@ -67,7 +65,7 @@ D365 项目的日常摩擦，大多不是"不会写代码"，而是**环境之�
 
 | 工具 | 用途 |
 | --- | --- |
-| `d365_write` | 选项集增/改/删值、新增/改/删字段、改表显示名、增删系统视图列；`plan-*` 只出计划，`execute` 必须人工确认 |
+| `d365_metadata_write` | 选项集增/改/删值、新增/改/删字段、改表显示名、增删系统视图列；`plan-*` 只出计划，`execute` 必须人工确认 |
 
 ### 迁移与检查
 
@@ -81,7 +79,7 @@ D365 项目的日常摩擦，大多不是"不会写代码"，而是**环境之�
 
 | 工具 | 用途 |
 | --- | --- |
-| `d365_trace` | 插件跟踪日志：谁跑了、抛了什么、按签名归并；messageblock 里的凭据会屏蔽（需 `data.read`） |
+| `d365_diagnose` | 运行时就一个名字：`action: health` 看挂起/失败的导入发布与作业；`action: trace-list` / `trace-summary` / `trace-get` / `trace-stages` 看插件跟踪日志（按签名归并、凭据屏蔽，需 `data.read`）；`action: perf-hotspots` / `perf-slowest` / `perf-trend` 看插件耗时 |
 | `d365_invoke` | 真正调一次 Dataverse 消息，看状态码与响应体；GET function 需 `data.read`，POST action 需 `message.invoke` 且每次确认 |
 | `d365_flows` | Power Automate 云流（`workflow` 表 `category = 5`）：目录、单条流程的触发器/动作/连接器、哪些流程会碰某张表 |
 
@@ -89,7 +87,7 @@ D365 项目的日常摩擦，大多不是"不会写代码"，而是**环境之�
 
 | 工具 | 用途 |
 | --- | --- |
-| `d365_access` | 谁拥有某个角色（直接拥有或通过团队继承）、某用户有哪些角色、某角色能对哪些表做什么、什么深度；改角色归属或改角色权限走两段式计划（`role.admin`，默认关闭） |
+| `d365_roles` | 谁拥有某个角色（直接拥有或通过团队继承）、某用户有哪些角色、某角色能对哪些表做什么、什么深度；改角色归属或改角色权限走两段式计划（`role.admin`，默认关闭） |
 
 ### 运维
 
@@ -112,7 +110,7 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 | GitLab | 仓库地址、默认项目、只读令牌（`read_api`） |
 | 常规 | 快照保留份数、默认行数上限、请求超时 |
 
-界面语言跟随 DSH（中文 / English）。环境清单与 `d365_configure` 走同一份存储代码，界面和 agent 看到的一定一致。
+界面语言跟随 DSH（中文 / English）。环境清单与 `d365_envs` 走同一份存储代码，界面和 agent 看到的一定一致。
 
 ---
 
@@ -122,10 +120,10 @@ DSH Web UI 的「设置 → D365 工具箱」，六个标签页：
 
 ```bash
 # 从 npm 安装（最短，可升级；包发布到 npm 或内网 registry 后可用）
-plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.37.0"
 
 # 从 Git 安装（不需要 registry，可钉 tag）
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.37.0"
 
 # 或从本地目录安装（link，改代码立刻生效）
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -175,7 +173,7 @@ d365_data   action=group entity=account field=contoso_customertier
 ### 3. 两个环境为什么不一样
 
 ```
-d365_sync environments=["dev","sit"]
+d365_snapshot environments=["dev","sit"]
 d365_diff base=dev head=sit resources=["forms","views","attributes"]
 d365_layers component=Account componentType=SystemForm
 ```
@@ -192,7 +190,7 @@ C# 改动会核对程序集版本、插件类型、步骤、step 镜像与过滤
 ### 5. 补 36 个税号选项（写入全流程）
 
 ```
-d365_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos labels=["AD3|Andorra: Tax Register Number", ...]
+d365_metadata_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos labels=["AD3|Andorra: Tax Register Number", ...]
 
 （agent 返回计划与操作列表）
 执行 mw04aul6-1ci6aa
@@ -277,7 +275,7 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 | 文档 | 内容 |
 | --- | --- |
 | [docs/installation.md](docs/zh/installation.md) | 安装、首次配置、凭据、升级、卸载 |
-| [docs/tools.md](docs/zh/tools.md) | 21 个工具的参数、返回与示例 |
+| [docs/tools.md](docs/zh/tools.md) | 18 个工具的参数、返回与示例 |
 | [docs/scenarios.md](docs/zh/scenarios.md) | 8 个真实场景的完整走法 |
 | [docs/permissions.md](docs/zh/permissions.md) | 能力表、写入流程、预检查、安全边界 |
 | [docs/checks.md](docs/zh/checks.md) | 迁移评估、契约漂移、代码检查的规则与置信度 |
@@ -304,13 +302,13 @@ d365_contract action=drift source=dev targets=["sit","uat"] forms=true
 ## 开发
 
 ```
-index.js              # Host 入口：注册 21 个工具、挂设置页路由
+index.js              # Host 入口：注册 18 个工具、挂设置页路由
 client.js             # 设置页（六个标签，无构建步骤）
 lib/
   client.js           # Dataverse Web API 客户端（重试、分页、权限闸）
   auth.js             # Entra ID 客户端凭据流 + 令牌缓存
   config.js           # 配置加载与归一化
-  resources.js        # 19 类元数据资源的查询定义
+  resources.js        # 20 类元数据资源的查询定义
   write-actions.js    # 全部写操作的 planner / executor
   contract.js         # 契约矩阵与漂移规则
   migrate.js          # 迁移评估

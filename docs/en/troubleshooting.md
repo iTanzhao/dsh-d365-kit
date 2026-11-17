@@ -6,8 +6,8 @@
 
 ```
 plugin_manager list_plugins
-d365_envs check=true
-d365_health allEnvironments=true
+d365_envs action=check
+d365_diagnose action=health allEnvironments=true
 ```
 
 The first shows whether the plugin is present and active; the second checks credentials and network; the third shows whether the environment is busy. Most "tool errors" can be pinned down in these three steps.
@@ -31,9 +31,9 @@ The first shows whether the plugin is present and active; the second checks cred
 | `unknown-view` / `ambiguous-view` | The view name does not exist / several share the name | Pass `entity` to disambiguate |
 | `HTTP 400 … Could not find a property named` | The environment lacks that column, or the column name does not fit this endpoint | The tool attempts degradation; if it still fails, use `select` to name existing columns explicitly |
 | `0x80060888 … query parameter is not supported` | The endpoint rejects that parameter (e.g. `$top`/`$orderby` on `EntityDefinitions`) | The client already degrades automatically; keep this in mind when writing your own scripts |
-| `0x80071151` | The customization lock is held (an import/publish is running) | Confirm with `d365_health` and wait it out; do not retry in a loop |
+| `0x80071151` | The customization lock is held (an import/publish is running) | Confirm with `d365_diagnose action=health` and wait it out; do not retry in a loop |
 | `HTTP 429` | Service protection (about 6,000 requests / 5 minutes) | Lower `concurrency` (≤ 4) and retry later; only write requests retry automatically, and only on 429 |
-| Publish times out at 60–300 s | `PublishAllXml` is slow on an org with 2,000-plus tables | Already switched to `PublishXml` per affected component; if it still times out, check `d365_health` |
+| Publish times out at 60–300 s | `PublishAllXml` is slow on an org with 2,000-plus tables | Already switched to `PublishXml` per affected component; if it still times out, check `d365_diagnose action=health` |
 | `GitLab 403` | Token scope is insufficient, or the user is below Reporter on the project | Use another personal access token or raise the role; Guest cannot read the repo or MRs |
 | `GitLab 404` | Wrong project path or IID, or the token cannot see the project | Use the full MR link, or fill in the default project |
 
@@ -115,7 +115,7 @@ The plan file is deleted once execution succeeds. Clicking an old card again or 
 
 ### The publish stays `running`
 
-Publishing runs in the background and the sidecar file is written only when it finishes. Check `d365_health` to see whether that environment is still publishing; once nothing is active, rerun `PublishXml` — publishing itself is idempotent (a repeat publish does not change the result).
+Publishing runs in the background and the sidecar file is written only when it finishes. Check `d365_diagnose action=health` to see whether that environment is still publishing; once nothing is active, rerun `PublishXml` — publishing itself is idempotent (a repeat publish does not change the result).
 
 ---
 
@@ -124,8 +124,8 @@ Publishing runs in the background and the sidecar file is written only when it f
 Collect these before asking:
 
 ```
-d365_envs
-d365_health environments=["<that environment>"]
+d365_envs action=list
+d365_diagnose action=health environments=["<that environment>"]
 ```
 
 Plus the full error text, the timestamp, and `.d365/write-guard.log` (for settings-page write problems).

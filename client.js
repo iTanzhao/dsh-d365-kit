@@ -7,7 +7,7 @@
  *   General       tool parameters that are not per-environment
  *
  * Data comes from the authenticated `/api/d365-meta/*` routes; the environment
- * list is the same storage the `d365_configure` tool writes, so the page can
+ * list is the same storage the `d365_envs` tool writes, so the page can
  * never drift from what the agent reads.
  */
 window.__ModuleLoader__.load({
@@ -102,7 +102,7 @@ window.__ModuleLoader__.load({
         'write.saveFailed': 'Could not save: {error}',
         'write.plans': 'Pending changes',
         'write.plansDesc': 'Plans prepared by the agent. Nothing runs until you confirm here or in the chat.',
-        'write.noPlans': 'No pending changes. The agent can prepare one with d365_write.',
+        'write.noPlans': 'No pending changes. The agent can prepare one with d365_metadata_write.',
         'write.execute': 'Review & execute',
         'write.confirmExecute': 'Execute now',
         'write.executing': 'Executing…',
@@ -243,7 +243,7 @@ window.__ModuleLoader__.load({
         'write.saveFailed': '保存失败：{error}',
         'write.plans': '待确认的写入',
         'write.plansDesc': 'agent 准备好的计划。在你确认之前，什么都不会执行。',
-        'write.noPlans': '没有待确认的变更。可以让 agent 用 d365_write 生成一个计划。',
+        'write.noPlans': '没有待确认的变更。可以让 agent 用 d365_metadata_write 生成一个计划。',
         'write.execute': '审阅并执行',
         'write.confirmExecute': '确认执行',
         'write.executing': '执行中…',

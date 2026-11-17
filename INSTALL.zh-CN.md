@@ -18,7 +18,7 @@
 ### 方式一：从 npm 装（最短，可升级）
 
 ```
-plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.37.0"
 ```
 
 前提是包已经发到 pnpm 用的那个 registry——公网 npm 或公司内网镜像都行。包名没有 scope，不需要配 scope 映射。
@@ -28,7 +28,7 @@ plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
 ### 方式二：从 Git 装（不需要 registry）
 
 ```
-plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<你的 Git>/<group>/dsh-d365-kit.git#v0.37.0"
 ```
 
 ### 方式三：从本地目录装
@@ -60,11 +60,11 @@ plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
 ## 验证
 
 ```
-d365_envs check=true
+d365_envs action=check
 d365_metadata resource=entities top=3
 ```
 
-都有内容就说明通了。第一次 `d365_sync` 会拉全量元数据（约 125 MB、三分钟左右），不想占盘可以先不做。
+都有内容就说明通了。第一次 `d365_snapshot` 会拉全量元数据（约 125 MB、三分钟左右），不想占盘可以先不做。
 
 ### 排查 skill 随插件一起装
 

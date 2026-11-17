@@ -1,7 +1,10 @@
 {
   "name": "dsh-d365-kit",
-  "version": "0.36.1",
+  "version": "0.37.0",
   "type": "module",
+  "scripts": {
+    "test": "node --test test/"
+  },
   "description": "Dynamics 365 CE developer and deployment toolkit for DSH: metadata, layers, snapshots, migration risk, code checks, contract drift, environment health, plug-in traces, message invocation and business-record sync.",
   "license": "MIT",
   "author": "iTanzhao",

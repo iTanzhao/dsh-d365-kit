@@ -1,46 +1,43 @@
 /**
  * `dsh-d365-kit` — D365 CE / Dataverse toolkit for DSH.
  *
- * Tools, one data path:
- *   d365_envs       which environments exist and whether they authenticate
- *   d365_metadata   the generic metadata query over a fixed resource catalogue
- *   d365_layers     the solution-layer stack behind any component
- *   d365_sync       snapshot an environment's metadata to local files
- *   d365_diff       compare two snapshots
- *   d365_configure  read/write the environment list (same storage as the UI)
- *   d365_write      prepare a metadata change, then confirm and apply it
- *   d365_migrate    assess what happens if a solution is imported into another environment
- *   d365_code_check what a merge request's changed scripts break in a target environment
- *   d365_refs       who references a field, script or plugin assembly
- *   d365_data       count / group / sample business records (needs `data.read`)
- *   d365_data_write create or patch one business record (needs `data.write`)
- *   d365_access     who holds a security role, what it may do, and the plans that change both
- *   d365_data_sync  move business records between environments (plan, then confirm)
- *   d365_invoke     call one action or function and return status + body (needs `message.invoke`)
- *   d365_trace      read plug-in trace logs to explain a failure (needs `data.read`)
- *   d365_perf       aggregate plug-in execution time: hotspots, slowest calls, trend
- *   d365_flows      Power Automate cloud flows: list, one flow's skeleton, who touches a table
- *   d365_contract   compare plugin registration / option values across environments
- *   d365_health     stuck jobs, running imports, recently installed solutions
- *   d365_reports    what this plugin wrote to disk, and how much space it takes
+ * Eighteen tools, one data path:
+ *   d365_envs            which environments exist, whether they authenticate,
+ *                        and the edits to that registry
+ *   d365_metadata        the generic metadata query over a fixed resource catalogue
+ *   d365_layers          the solution-layer stack behind any component
+ *   d365_snapshot        snapshot an environment's metadata to local files
+ *   d365_diff            compare two snapshots
+ *   d365_metadata_write  prepare a metadata change, then confirm and apply it
+ *   d365_migrate         assess what happens if a solution is imported elsewhere
+ *   d365_code_check      what a merge request's changed scripts break in a target environment
+ *   d365_refs            who references a field, script or plugin assembly
+ *   d365_contract        compare plugin registration / option values across environments
+ *   d365_data            count / group / sample business records (needs `data.read`)
+ *   d365_data_write      create or patch one business record (needs `data.write`)
+ *   d365_data_sync       move business records between environments (plan, then confirm)
+ *   d365_roles           who holds a security role, what it may do, and the plans that change both
+ *   d365_invoke          call one action or function and return status + body
+ *   d365_diagnose        stuck jobs, trace logs and plug-in timing, in one place
+ *   d365_flows           Power Automate cloud flows: list, one flow's skeleton, who touches a table
+ *   d365_reports         what this plugin wrote to disk, and how much space it takes
  *
  * Reads go through `lib/client.js`, which sends GET only and splits reads in
  * two: metadata (always allowed) and business records (needs `data.read` for
- * that environment, resolved by `lib/data-policy.js`). The single metadata
- * write path lives in `lib/write-actions.js` and always runs behind a plan that
- * a human approves; business record writes live in `lib/tool-data-write.js`,
- * are gated by `data.write`, and always ask for confirmation first.
+ * that environment, resolved by `lib/data-policy.js`). The metadata write path
+ * lives in `lib/write-actions.js` and always runs behind a plan that a human
+ * approved; business record writes live in `lib/tool-data-write.js`, are gated
+ * by `data.write`, and always ask for confirmation first.
  *
  * The Web UI half contributes a settings page ("D365 工具箱") that saves through
- * the same `lib/settings-store.js` functions as `d365_configure`, and reaches
- * the Host through the routes in `lib/settings-http.js`.
+ * the same `lib/settings-store.js` functions as `d365_envs`, and reaches the
+ * Host through the routes in `lib/settings-http.js`.
  */
 import { register as registerEnvironments } from './lib/tool-environments.js'
 import { register as registerMetadata } from './lib/tool-metadata.js'
 import { register as registerLayers } from './lib/tool-layers.js'
 import { register as registerSync } from './lib/tool-sync.js'
 import { register as registerDiff } from './lib/tool-diff.js'
-import { register as registerConfigure } from './lib/tool-configure.js'
 import { register as registerWrite } from './lib/tool-write.js'
 import { register as registerMigrate } from './lib/tool-migrate.js'
 import { register as registerCodeCheck } from './lib/tool-code-check.js'
@@ -49,12 +46,10 @@ import { register as registerData } from './lib/tool-data.js'
 import { register as registerDataWrite } from './lib/tool-data-write.js'
 import { register as registerAccess } from './lib/tool-access.js'
 import { register as registerContract } from './lib/tool-contract.js'
-import { register as registerHealth } from './lib/tool-health.js'
 import { register as registerReports } from './lib/tool-reports.js'
 import { register as registerDataSync } from './lib/tool-data-sync.js'
 import { register as registerInvoke } from './lib/tool-invoke.js'
-import { register as registerTrace } from './lib/tool-trace.js'
-import { register as registerPerf } from './lib/tool-perf.js'
+import { register as registerDiagnose } from './lib/tool-ops.js'
 import { register as registerFlows } from './lib/tool-flows.js'
 import { registerRoutes } from './lib/settings-http.js'
 import { registerSkills } from './lib/skill.js'
@@ -90,7 +85,6 @@ export function apply(ctx, config = {}) {
     registerLayers(ctx, state),
     registerSync(ctx, state),
     registerDiff(ctx, state),
-    registerConfigure(ctx, state),
     registerWrite(ctx, state),
     registerMigrate(ctx, state),
     registerCodeCheck(ctx, state),
@@ -100,11 +94,9 @@ export function apply(ctx, config = {}) {
     registerAccess(ctx, state),
     registerDataSync(ctx, state),
     registerInvoke(ctx, state),
-    registerTrace(ctx, state),
-    registerPerf(ctx, state),
+    registerDiagnose(ctx, state),
     registerFlows(ctx, state),
     registerContract(ctx, state),
-    registerHealth(ctx, state),
     registerReports(ctx, state),
   ]
 
@@ -118,8 +110,8 @@ export function apply(ctx, config = {}) {
     }
   })
 
-  // The troubleshooting skill travels with the package: registering it here is
-  // what makes installing the bundle enough, with no file to copy by hand.
+  // The skills travel with the package: registering them here is what makes
+  // installing the bundle enough, with no file to copy by hand.
   registerSkills(ctx)
 
   // Looked up rather than declared: a headless profile has no HTTP carrier and

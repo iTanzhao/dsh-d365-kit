@@ -5,7 +5,7 @@
 A **development and deployment assistant** for Dynamics 365 CE / Dataverse, installed as a [DeepSeek Harness](https://github.com/deepseek-ai) bundle.
 It turns a real D365 organization into something an agent can query directly: metadata, solution layers, snapshot diffs, references, migration risk, the impact of code changes, and controlled writes.
 
-> Twenty-one tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
+> Eighteen tools, one settings page. Read-only by default: tick a capability and it may do exactly that — even metadata reads are a tick of "Read metadata", on by default.
 
 ```
 You: which forms and views still use the contoso_customertier field on account in DEV?
@@ -25,8 +25,8 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 | Will deleting this field break something? | `d365_refs` reverse-looks-up forms / views / processes / plugin steps, `d365_data` shows how many records still use it |
 | Will this MR run once deployed to UAT? | `d365_code_check` maps JS to web resources and forms, and C# to assemblies/types/steps/images |
 | Upstream changed a plugin — has downstream caught up? | `d365_contract` treats upstream registrations as a contract and compares them item by item downstream, with waivers and trends |
-| Can we deploy right now? | `d365_health` shows suspended imports/publishes and failed jobs; the pre-flight check before writes uses the same data |
-| Need to add a field / option value / view column? | `d365_write` produces a plan → a human confirms in the conversation → only then does it write, with a queryable audit trail afterwards |
+| Can we deploy right now? | `d365_diagnose` with `action: health` shows suspended imports/publishes and failed jobs; the pre-flight check before writes uses the same data |
+| Need to add a field / option value / view column? | `d365_metadata_write` produces a plan → a human confirms in the conversation → only then does it write, with a queryable audit trail afterwards |
 
 ---
 
@@ -36,22 +36,20 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 
 | Tool | Purpose |
 | --- | --- |
-| `d365_envs` | Environment inventory, whether credentials are complete; with `check: true` it actually connects once |
-| `d365_configure` | Add, edit or remove environments (URL, tenant, ClientId, secret), test connectivity |
-| `d365_health` | Suspended/failed background jobs, in-progress import publishes, recently installed solutions |
+| `d365_envs` | One place for the environment registry: `action: list` shows what exists and whether credentials are complete, `check` connects once, `save` / `remove` edit URL, tenant, ClientId, secret and the default environment |
 
 ### Metadata and solution layers
 
 | Tool | Purpose |
 | --- | --- |
-| `d365_metadata` | 19 resource kinds: entities, attributes, relationships, forms, views, workflows, business rules, plugins, web resources, solutions, components, Custom APIs, sitemaps, option sets |
+| `d365_metadata` | 20 resource kinds: entities, attributes, relationships, forms, views, workflows, business rules, plugins, web resources, solutions, components, Custom APIs, sitemaps, option sets |
 | `d365_layers` | `msdyn_componentlayer`: which solutions have overridden a component, who is on top, and which layer is currently active |
 
 ### Snapshots and diff
 
 | Tool | Purpose |
 | --- | --- |
-| `d365_sync` | Pulls an environment's metadata into a local snapshot, recording "complete / truncated / failed" per resource |
+| `d365_snapshot` | Pulls an environment's metadata into a local snapshot, recording "complete / truncated / failed" per resource |
 | `d365_diff` | Field-level differences between two snapshots (added, removed, modified), with noise filtering and a stale-snapshot warning |
 
 ### Impact and data
@@ -67,7 +65,7 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 
 | Tool | Purpose |
 | --- | --- |
-| `d365_write` | Add/update/delete option values, add/update/delete fields, rename a table, add or remove system view columns; `plan-*` only produces a plan, `execute` requires manual confirmation |
+| `d365_metadata_write` | Add/update/delete option values, add/update/delete fields, rename a table, add or remove system view columns; `plan-*` only produces a plan, `execute` requires manual confirmation |
 
 ### Migration and checks
 
@@ -81,7 +79,7 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 
 | Tool | Purpose |
 | --- | --- |
-| `d365_trace` | Plug-in trace logs: what ran, what threw, grouped by signature; credentials in the message block are masked (requires `data.read`) |
+| `d365_diagnose` | The runtime under one name: `action: health` for suspended imports/publishes and failed jobs; `action: trace-list` / `trace-summary` / `trace-get` / `trace-stages` for plug-in trace logs, grouped by signature, credentials masked (requires `data.read`); `action: perf-hotspots` / `perf-slowest` / `perf-trend` for plug-in timing |
 | `d365_invoke` | Call one Dataverse message and see the real status and body; GET functions need `data.read`, POST actions need `message.invoke` plus a confirmation each time |
 | `d365_flows` | Power Automate cloud flows (`workflow` rows with `category = 5`): catalog, one flow's trigger/actions/connectors, and which flows touch a given table |
 
@@ -89,7 +87,7 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 
 | Tool | Purpose |
 | --- | --- |
-| `d365_access` | Who holds a role (directly or through a team), which roles a user has, what a role may do on which tables at which depth; and two-phase plans to change role membership or privileges (`role.admin`, off by default) |
+| `d365_roles` | Who holds a role (directly or through a team), which roles a user has, what a role may do on which tables at which depth; and two-phase plans to change role membership or privileges (`role.admin`, off by default) |
 
 ### Operations
 
@@ -112,7 +110,7 @@ Most day-to-day friction in D365 projects is not "can't write code", it is **inf
 | GitLab | Repository URL, default project, read-only token (`read_api`) |
 | General | Snapshots to keep, default row limit, request timeout |
 
-The UI language follows DSH (Chinese / English). The environment inventory and `d365_configure` go through the same storage code, so what the UI shows and what the agent sees always match.
+The UI language follows DSH (Chinese / English). The environment inventory and `d365_envs` go through the same storage code, so what the UI shows and what the agent sees always match.
 
 ---
 
@@ -122,10 +120,10 @@ Prerequisites: DSH desktop; network access to `*.dynamics.com`; a read-only appl
 
 ```bash
 # From npm (shortest, upgradeable; works once the package is published)
-plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.37.0"
 
 # From Git (no registry needed, pin a tag)
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.37.0"
 
 # From a local directory (link: code changes take effect immediately)
 plugin_manager install_bundle target="D:\path\to\dsh-d365-kit"
@@ -175,7 +173,7 @@ d365_data   action=group entity=account field=contoso_customertier
 ### 3. Why two environments differ
 
 ```
-d365_sync environments=["dev","sit"]
+d365_snapshot environments=["dev","sit"]
 d365_diff base=dev head=sit resources=["forms","views","attributes"]
 d365_layers component=Account componentType=SystemForm
 ```
@@ -192,7 +190,7 @@ C# changes are checked against assembly version, plugin types, steps, step image
 ### 5. Add 36 tax ID option values (the full write flow)
 
 ```
-d365_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos labels=["AD3|Andorra: Tax Register Number", ...]
+d365_metadata_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos labels=["AD3|Andorra: Tax Register Number", ...]
 
 (the agent returns the plan and the operation list)
 Run mw04aul6-1ci6aa
@@ -277,7 +275,7 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 | Document | Contents |
 | --- | --- |
 | [docs/en/installation.md](docs/en/installation.md) | Installation, first-time setup, credentials, upgrade, uninstall |
-| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 21 tools |
+| [docs/en/tools.md](docs/en/tools.md) | Parameters, return values and examples for the 18 tools |
 | [docs/en/scenarios.md](docs/en/scenarios.md) | Complete walkthroughs for 8 real scenarios |
 | [docs/en/permissions.md](docs/en/permissions.md) | Capability table, write flow, pre-flight check, safety boundary |
 | [docs/en/checks.md](docs/en/checks.md) | Rules and confidence levels for migration assessment, contract drift and code checks |
@@ -304,13 +302,13 @@ See [docs/en/permissions.md](docs/en/permissions.md) for details.
 ## Development
 
 ```
-index.js              # Host entry: registers the 21 tools, mounts the settings page routes
+index.js              # Host entry: registers the 18 tools, mounts the settings page routes
 client.js             # settings page (six tabs, no build step)
 lib/
   client.js           # Dataverse Web API client (retry, paging, permission gate)
   auth.js             # Entra ID client credentials flow + token cache
   config.js           # config loading and normalization
-  resources.js        # query definitions for the 19 metadata resource kinds
+  resources.js        # query definitions for the 20 metadata resource kinds
   write-actions.js    # planner / executor for all write operations
   contract.js         # contract matrix and drift rules
   migrate.js          # migration assessment

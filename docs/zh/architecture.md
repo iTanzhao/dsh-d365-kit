@@ -7,7 +7,7 @@
 一个 DSH bundle，两部分：
 
 ```
-index.js      # Host 侧：注册 21 个工具、挂设置页的 HTTP 路由
+index.js      # Host 侧：注册 18 个工具、挂设置页的 HTTP 路由
 client.js     # Web 侧：设置页（六个标签，无构建步骤，直接是浏览器模块）
 lib/*.js      # Host 侧全部逻辑（51 个模块）
 ```
@@ -17,6 +17,10 @@ lib/*.js      # Host 侧全部逻辑（51 个模块）
 `cordis.patch.yml` 声明 bundle 与默认配置（`configFile`、`timeoutMs`、`snapshotKeep`、`environments`）；
 `package.json` 的 `dsh.bundle.patch` 指向它，`dsh.client` 声明 Web 侧入口。
 
+`index.js` 导出 `name` 与 `inject`，**不**导出 `Config` schema：DSH 那里要的是 Cordis Schema 实例，而这个包刻意不带任何依赖，
+所以行配置放到读取它的地方校验——`lib/config.js` 的 `normalizeConfig` 检查 URL、超时与上限，遇到不合法的环境会保留并标记，而不是
+悄悄丢掉，问题作为 `issues` 返回。原本静默的规则由 `test/rules.test.js` 覆盖。
+
 ## 模块分工
 
 ```
@@ -24,7 +28,7 @@ lib/
   client.js           Dataverse Web API 客户端：拼 URL、分页、重试、权限闸、令牌
   auth.js             Entra ID 客户端凭据流；令牌按凭据指纹缓存
   config.js           配置加载/归一化；configFile 回退链；密钥解析
-  resources.js        19 类元数据资源的查询定义与字段映射
+  resources.js        20 类元数据资源的查询定义与字段映射
   runtime.js          makeClient(env, config)、组织信息、版本
   snapshot.js         快照写入、manifest、快照目录
   retention.js        保留策略、磁盘统计、清理、压缩
@@ -39,12 +43,14 @@ lib/
   code-check.js       MR 检查（JS/TS）
   csharp-check.js     MR 检查（C#）
   refs.js             反向索引（表单/视图/流程/步骤）
-  health.js           环境健康
+  health.js           环境健康（`d365_diagnose action=health` 的背后）
   gitlab.js           GitLab API（MR diff、连通性）
   waivers.js          契约豁免
   contract-history.js 漂移趋势
   data-migrate.js     业务记录跨环境迁移（计划、lookup 解析、写入、run 记录）
-  tool-*.js           21 个工具，一个文件一个工具（或一组相关的）
+  tool-environments.js `d365_envs`：list / check / save / remove（`tool-configure.js` 已删，save 与 remove 并到这里）
+  tool-ops.js         `d365_diagnose`：health / trace-* / perf-*——活仍在 `tool-health.js`、`tool-trace.js`、`tool-perf.js`（以及 `health.js`）
+  tool-*.js           其余 16 个工具，一个文件一个工具（或一组相关的）
 ```
 
 ## 数据流
@@ -60,7 +66,7 @@ agent 调 d365_*  ──> tool-*.js ──> lib 能力模块 ──> client.js �
 设计原则：
 
 1. **工具返回摘要与路径，正文落文件**——对话里不塞几十 MB 的 JSON；
-2. **只读优先**——只有 `d365_write execute` 与 `d365_data_write` 会改环境，且必须人批准；
+2. **只读优先**——只有 `d365_metadata_write execute` 与 `d365_data_write` 会改环境，且必须人批准；
 3. **判定收在一处**——能看什么/能改什么都在 `lib/client.js` 的请求入口判定，新工具无法绕过；
 4. **实时优于快照**——漂移、迁移、健康这类「现在怎么样」的问题读实时；快照只用于跨时间/跨环境比较；
 5. **规则是数据**——契约规则、保留策略、能力表都是表驱动，加规则不改流程。
@@ -155,10 +161,10 @@ globalThis.fetch = async (url) => new Response(JSON.stringify({ value: [] }), { 
 真实环境验证的最小集：
 
 ```
-d365_envs check=true
+d365_envs action=check
 d365_metadata resource=entities top=2
 d365_layers component=account componentType=Entity
-d365_health environments=["<env>"]
+d365_diagnose action=health environments=["<env>"]
 ```
 
 ## 已知的坑（写给下一个改代码的人）

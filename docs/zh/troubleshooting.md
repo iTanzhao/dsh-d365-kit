@@ -6,8 +6,8 @@
 
 ```
 plugin_manager list_plugins
-d365_envs check=true
-d365_health allEnvironments=true
+d365_envs action=check
+d365_diagnose action=health allEnvironments=true
 ```
 
 第一条看插件在不在、是否 active；第二条看凭据与网络；第三条看环境是不是正忙。多数「工具报错」能在这三步里定位。
@@ -31,9 +31,9 @@ d365_health allEnvironments=true
 | `unknown-view` / `ambiguous-view` | 视图名不存在 / 同名多个 | 传 `entity` 区分 |
 | `HTTP 400 … Could not find a property named` | 该环境没有这个列，或列名不适配此端点 | 工具会尝试降级；仍失败时用 `select` 显式指定存在的列 |
 | `0x80060888 … query parameter is not supported` | 端点不接受该参数（如 `EntityDefinitions` 的 `$top`/`$orderby`） | 客户端已自动降级；自己写脚本时注意 |
-| `0x80071151` | 定制化锁被占用（正在导入/发布） | 用 `d365_health` 确认，等结束；别反复重试 |
+| `0x80071151` | 定制化锁被占用（正在导入/发布） | 用 `d365_diagnose action=health` 确认，等结束；别反复重试 |
 | `HTTP 429` | 服务保护（约 6000 请求/5 分钟） | 降并发（`concurrency` ≤ 4）、稍后重试；写请求只在 429 时自动重试 |
-| 发布 60–300 秒超时 | `PublishAllXml` 在两千多张表的组织上很慢 | 已改为按受影响组件 `PublishXml`；仍超时看 `d365_health` |
+| 发布 60–300 秒超时 | `PublishAllXml` 在两千多张表的组织上很慢 | 已改为按受影响组件 `PublishXml`；仍超时看 `d365_diagnose action=health` |
 | `GitLab 403` | 令牌 scope 不足，或用户在项目里低于 Reporter | 换个人访问令牌或提升角色；Guest 读不到仓库与 MR |
 | `GitLab 404` | 项目路径或 IID 错，或令牌看不到该项目 | 用完整 MR 链接，或填默认项目 |
 
@@ -115,7 +115,7 @@ Host 侧可能已加载、客户端半边没进模块图：重启一次。仍没
 
 ### 发布一直 `running`
 
-发布在后台进行，sidecar 文件在结束时才写。看 `d365_health` 里该环境是否仍在发布；确认没有活动后重跑一次 `PublishXml` 即可，发布本身是幂等的（重复发布不改变结果）。
+发布在后台进行，sidecar 文件在结束时才写。看 `d365_diagnose action=health` 里该环境是否仍在发布；确认没有活动后重跑一次 `PublishXml` 即可，发布本身是幂等的（重复发布不改变结果）。
 
 ---
 
@@ -124,8 +124,8 @@ Host 侧可能已加载、客户端半边没进模块图：重启一次。仍没
 收集这些再问：
 
 ```
-d365_envs
-d365_health environments=["<那个环境>"]
+d365_envs action=list
+d365_diagnose action=health environments=["<那个环境>"]
 ```
 
 加上报错的完整文本、时间点，以及 `.d365/write-guard.log`（设置页写入问题时）。

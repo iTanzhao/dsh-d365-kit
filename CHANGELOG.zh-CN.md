@@ -2,23 +2,55 @@
 
 **[English](CHANGELOG.md)** | 简体中文
 
-版本语义：修 bug 升 patch，加工具/加能力升 minor，改配置结构或改名升 major。
+版本语义：修 bug 升 patch，加工具/加能力升 minor。0.x 期间改名或改动工具面也升 minor，并在小节开头写 **Breaking**。
+
+## 0.37.0
+
+二十一个工具收成十八个，每个描述都补上一句「它不是用来做什么的」。这一版改的是工具名，任何写死旧名的地方（agent 预设、自己的提示词、收藏的命令）都要改。
+
+**Breaking：改名与合并**
+
+| 0.36.1 | 0.37.0 |
+| --- | --- |
+| `d365_write` | `d365_metadata_write` |
+| `d365_sync` | `d365_snapshot` |
+| `d365_access` | `d365_roles` |
+| `d365_configure` | `d365_envs`（`action: save` / `remove`；原来的 `check: true` 布尔改为 `action: check`） |
+| `d365_trace` | `d365_diagnose` 的 `action: trace-list` / `trace-get` / `trace-summary` / `trace-stages` |
+| `d365_perf` | `d365_diagnose` 的 `action: perf-hotspots` / `perf-slowest` / `perf-trend` |
+| `d365_health` | `d365_diagnose` 的 `action: health` |
+
+没有别名：旧名直接「找不到工具」，而不是被悄悄接住。合并挑的是读同一批数据的工具——`d365_diagnose` 的三个视角都来自 `plugintracelog`，而环境清单原本拆在两个工具里，写的却是同一个文件。
+
+**每个描述结尾都点名邻居**
+- 每个工具描述的最后一句话说清另一件相近的事该用谁：只改元数据，记录走 `d365_data_write`（单条）或 `d365_data_sync`（批量）；比的是本地快照，先 `d365_snapshot`。
+- `action` 的枚举值写在 `action` 参数上，而不只在正文里（九个 `plan-*` 操作以前被笼统写成「plan-*」）。
+- 参数描述收成一两句，写的是规则——范围、枚举、默认值、适用于哪个 action——而不是实现细节。原来用英文写的两个描述已统一成中文。
+- 代价与收益：整份描述（名字、正文、参数 schema、输出 schema）从 21 个工具的 34.2k 字符降到 18 个的 31.6k——小了 7.4%，每次带工具列表的请求约少 900 token。参数正文缩短 8.1%；描述正文基本持平，因为新加的路由句大约等于删掉的重复句。
+
+**两个技能，而不是一个**
+- `d365-troubleshooting`（原有）改用新名字与新动作，并补上 `d365_code_check` 与 `perf-*` 那条排查线。
+- `d365-changes`（新增）是另一半：读 → 出计划 → 确认 → 执行；哪些能力默认关闭；哪些操作不可恢复；以及为什么 `d365_migrate` / `d365_code_check` 的「没有阻断项」不是放行。
+- 两个技能都随包发布、由插件注册，装 bundle 即可，不用手工拷文件。
+
+**测试**
+- `npm test` 即 `node --test test/`——22 个测试，覆盖计划存储（认领锁、只执行一次、审计目录过滤）、共享规则（`recordKey`、`ownerLookup`、`keyedRows`、`compareVersion`、`writeTotals`），以及工具面本身（18 个唯一名字、每个描述与参数都有说明、写工具标明所需权限、中英 locale 键一致、两个技能都能加载、源码里不再出现被移除的旧名）。
 
 ## 0.36.1
 
 对整套工具逐文件读了一遍。问题反复落在三处：写入可能不是被批准的那份计划、残缺的答案看起来像完整的、截断被当成了事实。
 
 **写入**
-- **一份计划只执行一次，而且必须是批准时的那份。** `d365_write`（以及设置页）现在先在第一个请求前用独占锁文件认领计划，再从磁盘重读一遍：状态仍是 `pending`、环境地址没变、操作类型重新推导出的权限仍然通过——权限按操作类型算，不按计划文件里的 `capability` 字段。设置页取消计划后卡片再批准，现在什么也不做；以前会照旧执行它记住的操作。
+- **一份计划只执行一次，而且必须是批准时的那份。** `d365_metadata_write`（以及设置页）现在先在第一个请求前用独占锁文件认领计划，再从磁盘重读一遍：状态仍是 `pending`、环境地址没变、操作类型重新推导出的权限仍然通过——权限按操作类型算，不按计划文件里的 `capability` 字段。设置页取消计划后卡片再批准，现在什么也不做；以前会照旧执行它记住的操作。
 - **审计先写「打算做什么」。** 意图行在第一次写入前落盘，同一个文件在结束时改写为结果；进程中途被杀留下的是 `running` 行，而不是什么都没有。
-- **`d365_access` 终于能执行了。** 它把配置对象当路径传给权限读取，读不到就退回默认权限，于是「改安全角色」永远显示未授权。部分失败的计划也不再被直接删掉，失败记录留在原处。
-- 安全角色计划只在它自己的卡片上执行：设置页拒绝（卡片上才写清角色、对象与权限），`d365_write` 也拒绝派发角色类操作。
+- **`d365_roles` 终于能执行了。** 它把配置对象当路径传给权限读取，读不到就退回默认权限，于是「改安全角色」永远显示未授权。部分失败的计划也不再被直接删掉，失败记录留在原处。
+- 安全角色计划只在它自己的卡片上执行：设置页拒绝（卡片上才写清角色、对象与权限），`d365_metadata_write` 也拒绝派发角色类操作。
 - 确认卡片里的操作摘要会做清洗——带换行的标签以前能在卡片上伪造出额外的「操作」。
 - 设置页的写入确认头按它的实际作用描述：它是跨站防护。以同一用户身份运行的本机程序同样能发，文档不再声称它证明「人点过按钮」；真正约束写入的是计划文件、锁和执行前的权限复核。
 
 **「没核对」不再被报成「没问题」**
 - `d365_diff`：只有另一侧**完整**时才把单侧行记为新增 / 删除；快照截断、某个表读取失败、文件读不出来时给出 `未确认` 行并写明原因。行按 `name` 加作用域列对齐（表单 `objecttypecode`、视图 `returnedtypecode`、其余 `primaryentity`）——两个同名表单以前会被并成一行。
-- `d365_sync`：显式 `keep` 生效（保留策略以前会再按 `snapshotKeep` 裁一次，把要求保留的快照静默删掉）；字段分页读 `hasMore`，被截断的字段清单会标注；按表取数的资源真正按表取，不再拼 `LogicalName='undefined'`；清单只列实际写出的文件。
+- `d365_snapshot`：显式 `keep` 生效（保留策略以前会再按 `snapshotKeep` 裁一次，把要求保留的快照静默删掉）；字段分页读 `hasMore`，被截断的字段清单会标注；按表取数的资源真正按表取，不再拼 `LogicalName='undefined'`；清单只列实际写出的文件。
 - `d365_migrate`：只要有组件没核对成功（类型未映射、缺名称、探测失败）就输出「无法下结论」，并单列「未能核对的组件」。`d365_code_check`：diff 里没有类声明时不再静默跳过；步骤按消息与表匹配（`$select` 降级以前把两者一起丢了）；字段查询失败算「未知 → 人工确认」而不是「不存在」；程序集版本按数字比；`+++i;` 不再被当成 diff 头吃掉；`<formLibraries>` 也算绑定；拿不到 diff 的文件列为「未核对」，不再算「没有元数据阻断项」。
 - 契约漂移按消息、阶段、模式**和表**比对步骤；缺表不再被任意表的步骤满足。
 
@@ -38,7 +70,7 @@
 - `d365_invoke` 校验消息名、实体集、记录 id 与 GET 参数名；POST 现在需要 `message.invoke` **和** `data.write`（以前拿到 `message.invoke` 就能对所有 POST 绕过数据写入门槛）。
 - 设置页：错误会显示随行提示，轮询失败按退避重试而不是停掉，只有 `pending` 计划能点执行，删除与移除层标为不可恢复，时间戳按本地格式显示，保存前校验每个环境键，Discard 不能连点。
 
-值得注意的行为变化：`d365_data id` 不再接受裸的引号备用键（`'contoso_001'`）；`d365_sync keep` 会覆盖保留策略的份数；`d365_diff` 的行可能是 `未确认`；安全角色计划只在对话卡片上执行。
+值得注意的行为变化：`d365_data id` 不再接受裸的引号备用键（`'contoso_001'`）；`d365_snapshot keep` 会覆盖保留策略的份数；`d365_diff` 的行可能是 `未确认`；安全角色计划只在对话卡片上执行。
 
 ## 0.36.0
 
@@ -64,7 +96,7 @@
 
 ## 0.35.0
 
-新增 `d365_access`：把「角色 → 权限 → 表 × 深度」这条链摊开，既能查也能改。工具数 19 → 20。
+新增 `d365_roles`：把「角色 → 权限 → 表 × 深度」这条链摊开，既能查也能改。工具数 19 → 20。
 
 - 四个读动作：`roles`（按名聚合，同名角色按业务部门各一份）、`who-has-role`（直接拥有 + 通过团队继承，分段列出）、`user-roles`（某用户直接与继承的角色）、`role-privileges`（表 × 八种权限，单元格是深度词：本人 / 本部门 / 本部门及下级 / 组织）。
 - 四个写入计划：`plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`。写入仍是两段式：计划落 `.d365/pending-writes/`，`execute` 先校验能力、再弹确认卡片，写完记 `.d365/changes/`。
@@ -121,7 +153,7 @@
 
 文档：工具参考与排查 skill 的开头各加一张「按问题查」的路由表。
 
-- **`docs/zh/tools.md` / `docs/en/tools.md` 开头新增路由表**——16 个问题、对应工具，以及「容易误用成什么」（改一批记录该用 `d365_data_sync plan-update` 而不是 `d365_data_write`；「这个字段为什么不在表单上」该用 `d365_refs` + `d365_layers` 而不是只看 `attributes`；「两个环境差在哪」该用 `d365_sync` + `d365_diff` 而不是两边各查一遍对眼）；
+- **`docs/zh/tools.md` / `docs/en/tools.md` 开头新增路由表**——16 个问题、对应工具，以及「容易误用成什么」（改一批记录该用 `d365_data_sync plan-update` 而不是 `d365_data_write`；「这个字段为什么不在表单上」该用 `d365_refs` + `d365_layers` 而不是只看 `attributes`；「两个环境差在哪」该用 `d365_snapshot` + `d365_diff` 而不是两边各查一遍对眼）；
 - **`skills/d365-troubleshooting/SKILL.md` 也带上同一张表**，排查时随 skill 一起加载，不用先查文档；
 - 「只读与写入」的约定补上 `d365_invoke`（POST）也属于会改环境、需要确认的调用。
 
@@ -151,7 +183,7 @@
 - **`d365_data` 把实体名原样拼进 `$filter`**（`odataString` 导入了却没用）：名字里有单引号会被 400 吞成「实体不存在」，构造的名字还能扩大过滤范围。现在只接受逻辑名形态；
 - **`d365_health` 没权限时报「0 个失败」**：三个作业查询都是 `catch(() => null)` 再 `?? 0`，缺 `data.read` / 403 时在排查工具上给出假的安全结论。现在三列显示 `—` 并写明原因；
 - **`d365_trace` 只在 `get` 里屏蔽凭据**：`list` 与 `summary` 把原始 `exceptiondetails` 写进产物和对话。现在三个动作都屏蔽；
-- **`d365_sync` 提供按实体取的资源却没有实体参数**（`attributes`、`keys`、`*_relationships`），会拼出 `LogicalName='undefined'`；现在跳过并在「问题」里说明。`d365_contract` 补上「已过期豁免」计数，`handler-missing` 改为按环境去重（以前同一个缺函数只在第一个环境报）；
+- **`d365_snapshot` 提供按实体取的资源却没有实体参数**（`attributes`、`keys`、`*_relationships`），会拼出 `LogicalName='undefined'`；现在跳过并在「问题」里说明。`d365_contract` 补上「已过期豁免」计数，`handler-missing` 改为按环境去重（以前同一个缺函数只在第一个环境报）；
 - 设置/配置 JSON 的临时文件名加了随机后缀：同一进程两次并发保存共用 `${path}.tmp-${pid}`，可能把彼此写了一半的内容改名落盘。
 
 ## 0.32.1
@@ -215,7 +247,7 @@
 
 删未受管层不再只限表和字段，`d365_layers` 认识的组件类型全部支持。
 
-- `d365_write plan-remove-layer` 接受全部 11 种 `componentType`（`Entity`、`Attribute`、`OptionSet`、`SavedQuery`、`Workflow`、`SystemForm`、`WebResource`、`PluginType`、`PluginAssembly`、`SdkMessageProcessingStep`、`CustomAPI`）；发给 `RemoveActiveCustomizations` 的数值 `ComponentType` 取自真实服务上的 `solutioncomponent.componenttype` 选项集，不是猜的（`CustomAPI` 用它所在表自身的 object type code，10519）；
+- `d365_metadata_write plan-remove-layer` 接受全部 11 种 `componentType`（`Entity`、`Attribute`、`OptionSet`、`SavedQuery`、`Workflow`、`SystemForm`、`WebResource`、`PluginType`、`PluginAssembly`、`SdkMessageProcessingStep`、`CustomAPI`）；发给 `RemoveActiveCustomizations` 的数值 `ComponentType` 取自真实服务上的 `solutioncomponent.componenttype` 选项集，不是猜的（`CustomAPI` 用它所在表自身的 object type code，10519）；
 - 计划里先完整列出层栈，再说明删完由哪一层接管，删之前不用打开 JSON 也能核；
 - 删除后的发布范围跟着组件走：表或字段发布该表，表单或视图发布其所属表，选项集发布该选项集，其余走全量发布——归属查不到时不猜，退回全量发布而不是发错范围；
 - 修复：不归属任何表的表单，Dataverse 的 `objecttypecode` 会返回字面量 `none`，原先会被当成表名传进发布；现在按「不缩小发布范围」处理。
@@ -235,7 +267,7 @@
 
 解决方案层现在可写了，但只开一种：移除未受管的自定义层。
 
-- `d365_write` 新增 action `plan-remove-layer` 与能力 `layer.remove`（「移除自定义层」，高危、默认关闭）：只有最上面那层显示为 `Active`（未命名的未受管层）时才删，删完由解决方案最后带来的那层重新生效；
+- `d365_metadata_write` 新增 action `plan-remove-layer` 与能力 `layer.remove`（「移除自定义层」，高危、默认关闭）：只有最上面那层显示为 `Active`（未命名的未受管层）时才删，删完由解决方案最后带来的那层重新生效；
 - 计划里写出整条层栈、被删的层、以及接手的是哪一层（没有下层就是「系统定义」）；执行仍走同一张确认卡片和同一次发布，发布范围收窄到受影响的表；
 - 背后只有 `RemoveActiveCustomizations` 一个消息。最上层属于某个解决方案时直接拒绝（`not-active-layer`）：那种定义归那个解决方案管，要么在解决方案里移除组件，要么发一个新 patch 覆盖它；
 - `DeleteAndPromote` 与 `RemoveSolutionComponent` 明确不做；
@@ -393,7 +425,7 @@
 
 - 元数据查询（19 类资源）、多环境对齐；
 - 解决方案层 `d365_layers`（虚拟实体，必须组件 id + 类型）；
-- 快照 `d365_sync` 与对比 `d365_diff`（manifest 记录完整性、噪声过滤）；
+- 快照 `d365_snapshot` 与对比 `d365_diff`（manifest 记录完整性、噪声过滤）；
 - 环境配置与设置页；
 - 写入能力：选项集增/改/删值、字段增/改/删、表显示名、系统视图列；计划 → 人工确认 → 执行 → 审计；
 - 修掉一批真实环境差异：`organization` 列缺失、元数据端点不支持 `$top`/`$orderby`、换用户后令牌缓存未失效、层表必须带类型。

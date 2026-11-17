@@ -9,19 +9,21 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 
 | 你手上是这个问题 | 用这个 | 不要用 |
 | --- | --- | --- |
-| 这个环境里到底有什么、版本多少 | `d365_envs`（`check` 真连） | 猜 URL |
+| 这个环境里到底有什么、版本多少 | `d365_envs action=check`（真连） | 猜 URL |
 | 这张表有哪些字段、某个字段的类型/默认值 | `d365_metadata resource=attributes`（派生列先 `cast`） | `d365_data` |
 | 这个字段为什么表单上没有 / 改了不生效 | `d365_refs kind=field` + `d365_layers` | 只看 `attributes` |
-| 两个环境差在哪 | `d365_sync` 两边 → `d365_diff` | 两边各查一遍对眼 |
+| 两个环境差在哪 | `d365_snapshot` 两边 → `d365_diff` | 两边各查一遍对眼 |
 | 目标环境缺哪个程序集/类型/步骤 | `d365_contract drift` | 翻 `plugin_steps` 5000 行 |
 | 这个表/选项集被哪些解决方案盖过 | `d365_layers` | `d365_metadata solutions` |
 | 导入会不会覆盖别人的层 | `d365_migrate` | `d365_diff` |
 | 把一批记录复制到另一个环境 | `d365_data_sync plan` → `execute` | 用 `d365_data_write` 手抄 |
 | 改一批已存在记录的某个字段 | `d365_data_sync plan-update` → `execute` | `d365_data_write` 一条一张卡 |
-| 改/建一条记录 | `d365_data_write` | `d365_write` |
-| 改元数据（字段、显示名、选项值、移除自定义层） | `d365_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
+| 改/建一条记录 | `d365_data_write` | `d365_metadata_write` |
+| 改元数据（字段、显示名、选项值、移除自定义层） | `d365_metadata_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
 | 这条记录长什么样、有多少条 | `d365_data`（`count`/`group`/`sample`/`query`） | `d365_metadata` |
-| 插件报错，为什么 | `d365_trace summary` → `get`，先 `d365_health` 排除异步作业 | 猜错误码 |
+| 插件报错，为什么 | `d365_diagnose action=trace-summary` → `trace-get`，先 `action=health` 排除异步作业 | 猜错误码 |
+| 为什么慢、时间花在哪 | `d365_diagnose action=perf-hotspots` → `perf-slowest` → `trace-stages` | 逐条打开跟踪日志 |
+| 这条 MR 的改动会不会弄坏目标环境 | `d365_code_check` | 先发上去再看 |
 | 这条消息现在返回什么 | `d365_invoke` | Postman 手拼 |
 | 这条表的逻辑是不是在云流里 / 哪些 flow 会碰它 | `d365_flows refs` → `show` | 在 Power Automate 门户里逐条点开 |
 | 产物太大看不全 | `d365_reports action=view`（`match` 找 GUID） | 全量读文件 |
@@ -32,9 +34,9 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 
 ## 先确认三件事（30 秒，别跳）
 
-1. **哪个环境**：`d365_envs` 看配置与连通性。环境搞错是最常见的假故障。
-2. **权限够不够**：跟踪日志属于业务数据，要 `data.read`；调 POST 消息要 `message.invoke`（默认关）。
-3. **跟踪有没有开**：`d365_health` 的「插件跟踪」列 = 关闭 / 仅异常 / 全部。列显示「关闭」时，任何 trace 查询都查不到东西——先让环境开起来，再谈排查。
+1. **哪个环境**：`d365_envs action=list` 看配置与连通性（`action=check` 真连一次）。环境搞错是最常见的假故障。
+2. **权限够不够**：跟踪日志属于业务数据，要 `data.read`；调 POST 消息要 `message.invoke`，**同时还要 `data.write`**（两级都默认关）。
+3. **跟踪有没有开**：`d365_diagnose action=health` 的「插件跟踪」列 = 关闭 / 仅异常 / 全部。列显示「关闭」时，任何 trace 查询都查不到东西——先让环境开起来，再谈排查。
 
 ## 排查顺序
 
@@ -44,24 +46,24 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 { "environments": ["sit"], "hours": 48 }
 ```
 
-`d365_health` 的挂起 / 近期失败（Completed 且 Failed）指向 `asyncoperation`。异步作业失败**不会**写插件跟踪日志，这两条线不要混。
+`d365_diagnose action=health` 的挂起 / 近期失败（Completed 且 Failed）指向 `asyncoperation`。异步作业失败**不会**写插件跟踪日志，这两条线不要混。
 
 ### 2. 归并签名：几百条失败通常是同一个 bug
 
 ```json
-{ "action": "summary", "hours": 24, "entity": "contact" }
+{ "action": "trace-summary", "hours": 24, "entity": "contact" }
 ```
 
-`d365_trace summary` 按「插件类型 + 消息 + 表 + 异常首行」归并。签名一样 = 同一个 bug 在反复发生，接着只查一条就够。
+`d365_diagnose action=trace-summary` 按「插件类型 + 消息 + 表 + 异常首行」归并。签名一样 = 同一个 bug 在反复发生，接着只查一条就够。
 
 ### 3. 取一条完整调用
 
 ```json
-{ "action": "list", "typename": "ContactSearch", "hours": 24, "top": 20 }
-{ "action": "get", "traceId": "<上一步的 id>" }
+{ "action": "trace-list", "typename": "ContactSearch", "hours": 24, "top": 20 }
+{ "action": "trace-get", "traceId": "<上一步的 id>" }
 ```
 
-`get` 给异常全文 + messageblock（入参）。messageblock 里有 `secureConfig` 的明文密钥，工具会屏蔽成 `***`——**不要**为了「看得清楚」去开 `includeConfig`。
+`trace-get` 给异常全文 + messageblock（入参）。messageblock 里有 `secureConfig` 的明文密钥，工具会屏蔽成 `***`——**不要**为了「看得清楚」去开 `includeConfig`。
 
 ### 4. 步骤到底注册在哪
 
@@ -79,7 +81,7 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
   "id": "<guid>", "parameters": { "Target": { "@odata.type": "Microsoft.Dynamics.CRM.account" } } }
 ```
 
-`d365_invoke` **失败不抛异常**，会把 HTTP 状态、Dataverse 错误码和响应体原样给你——这正是插件抛出的原始形状。GET function 走 `data.read`，POST action 走 `message.invoke`，每次都会弹确认卡片。
+`d365_invoke` **失败不抛异常**，会把 HTTP 状态、Dataverse 错误码和响应体原样给你——这正是插件抛出的原始形状。GET function 走 `data.read`，POST action 走 `message.invoke` + `data.write`，每次都会弹确认卡片。
 
 ### 6. 需要时再往下挖
 
@@ -103,7 +105,7 @@ description: 用 dsh-d365-kit 排查 Dynamics 365 / Dataverse 插件失败：插
 
 ## 三个真实踩过的坑
 
-- **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也列成失败——至少多算了 3 倍。`d365_trace` 默认已经排除。
+- **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也列成失败——至少多算了 3 倍。`d365_diagnose action=trace-list` 默认已经排除。
 - **`$count` 在 5000 截断**，`d365_metadata` 显示「≥5000」不是 bug，是服务端上限。要精确总数就分组或加条件。
 - **元数据读和业务数据读是两道闸**：`metadata.read` 默认开，`data.read` 默认关。查 trace 被拒时看的是 `data.read`，不是元数据那一道。
 

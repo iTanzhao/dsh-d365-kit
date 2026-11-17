@@ -13,8 +13,8 @@ Connect to all four environments and see what each one is doing.
 ```
 
 ```
-d365_envs check=true
-d365_health allEnvironments=true hours=24
+d365_envs action=check
+d365_diagnose action=health allEnvironments=true hours=24
 d365_metadata resource=organization
 d365_metadata resource=solutions top=10 orderby="installedon desc"
 ```
@@ -43,7 +43,7 @@ Three pieces of evidence together:
 - **Data**: the distribution of records that have a value for the field (empty is its own bucket);
 - **Layers**: who added the field and which solution owns the active layer — if it comes from a managed solution you cannot delete it locally, only the publisher can change it.
 
-The delete itself is `d365_write action=plan-delete-attribute ... acknowledge=true`, but you usually use these three pieces of evidence to convince people first.
+The delete itself is `d365_metadata_write action=plan-delete-attribute ... acknowledge=true`, but you usually use these three pieces of evidence to convince people first.
 
 ---
 
@@ -54,7 +54,7 @@ Sync forms, views, and fields from DEV and SIT, tell me the differences, then ex
 ```
 
 ```
-d365_sync   environments=["dev","sit"] resources=["forms","views","solutions"] includeAttributes=true entities=["account"]
+d365_snapshot   environments=["dev","sit"] resources=["forms","views","solutions"] includeAttributes=true entities=["account"]
 d365_diff   base=dev head=sit resources=["forms","views","attributes"]
 d365_layers component=Account componentType=SystemForm allEnvironments=true
 ```
@@ -116,7 +116,7 @@ contoso_taxcategoryos is still missing 36 tax registration number types; add the
 ```
 
 ```
-d365_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos \
+d365_metadata_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos \
   labels=["AD3|Andorra: Tax Register Number (NRT)", "..."]
 ```
 
@@ -163,10 +163,10 @@ Is any import or publish running in the four environments right now? I want to c
 ```
 
 ```
-d365_health allEnvironments=true
+d365_diagnose action=health allEnvironments=true
 ```
 
-If an environment has a `Publish` or an import in progress, any write gets `0x80071151` or waits until the lock times out. Wait for it to finish; `d365_write execute` checks this step itself and refuses outright when the environment is busy instead of throwing a raw 429.
+If an environment has a `Publish` or an import in progress, any write gets `0x80071151` or waits until the lock times out. Wait for it to finish; `d365_metadata_write execute` checks this step itself and refuses outright when the environment is busy instead of throwing a raw 429.
 
 Only use `force: true` once you have confirmed that record is a leftover (for example, an import that was interrupted days ago).
 
@@ -196,7 +196,7 @@ For the retention policy and automatic cleanup, see [tools.md](tools.md#d365_rep
 | Question | Combination |
 | --- | --- |
 | Is it safe to change this field | `d365_refs` + `d365_data` + `d365_layers` |
-| Can this version ship | `d365_health` + `d365_migrate` + `d365_contract` |
+| Can this version ship | `d365_diagnose action=health` + `d365_migrate` + `d365_contract` |
 | Can this MR merge | `d365_code_check` + `d365_refs` |
-| Where do the environments differ | `d365_sync` + `d365_diff` + `d365_layers` |
-| Why does it fail at runtime | `d365_refs` (field/script references) + `d365_layers` (who overrides) + `d365_health` (jobs) |
+| Where do the environments differ | `d365_snapshot` + `d365_diff` + `d365_layers` |
+| Why does it fail at runtime | `d365_refs` (field/script references) + `d365_layers` (who overrides) + `d365_diagnose action=health` (jobs) |

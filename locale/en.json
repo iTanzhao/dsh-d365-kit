@@ -16,7 +16,7 @@
       "title": "Solution layers",
       "description": "See which solutions cover a component and which layer is active"
     },
-    "d365_sync": {
+    "d365_snapshot": {
       "title": "Sync snapshot",
       "description": "Pull environment metadata into a local snapshot and record completeness"
     },
@@ -28,7 +28,7 @@
       "title": "Configure environments",
       "description": "List, save, remove or test environment definitions"
     },
-    "d365_write": {
+    "d365_metadata_write": {
       "title": "Metadata changes",
       "description": "Plan option values, attributes, table names and view columns, then apply after approval"
     },

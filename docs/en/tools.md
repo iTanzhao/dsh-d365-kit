@@ -2,36 +2,36 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-21 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+18 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
 
 Conventions:
 
 - **Environment parameters**: `environment` (single), `environments` (array), `allEnvironments` (all). When omitted, the configured default environment is used.
-- **Read vs. write**: only `d365_write execute`, `d365_data_write`, `d365_data_sync execute`, `d365_invoke` (POST) and `d365_access execute` change an environment, and each must be approved by a human on a confirmation card.
+- **Read vs. write**: only `d365_metadata_write execute`, `d365_data_write`, `d365_data_sync execute`, `d365_invoke` (POST) and `d365_roles execute` change an environment, and each must be approved by a human on a confirmation card.
 - **Artifacts**: `<workspace>/.d365/`. Paths are returned as **absolute paths** and can be opened directly with the file tools.
 
 ## Which tool for which question
 
 | Your question | Use | Not |
 | --- | --- | --- |
-| What is in this environment, which version | `d365_envs` (with `check`) | Guessing at URLs |
+| What is in this environment, which version | `d365_envs action=check` | Guessing at URLs |
 | Which columns does a table have, one column's type/default | `d365_metadata resource=attributes` (use `cast` for derived columns) | `d365_data` |
 | Why is this column missing from a form / why did my change not take effect | `d365_refs kind=field` (who uses it) + `d365_layers` (who overrides it) | `attributes` alone |
-| Where do two environments differ | `d365_sync` both, then `d365_diff` | Querying both and eyeballing |
+| Where do two environments differ | `d365_snapshot` both, then `d365_diff` | Querying both and eyeballing |
 | Which assembly, type or step is missing in the target | `d365_contract drift` (also older versions, form libraries, sitemap) | Paging 5000 `plugin_steps` |
 | Which solutions override this table or option set | `d365_layers` | `d365_metadata solutions` |
 | Will importing this solution overwrite someone else's layer | `d365_migrate` | `d365_diff` |
 | Copy a batch of records from DEV to SIT | `d365_data_sync plan` → `execute` (keeps GUIDs, resolves lookups, confirmation card) | Hand-copying with `d365_data_write` |
 | Change one field on many existing records | `d365_data_sync plan-update` → `execute` | `d365_data_write` (one card per record) |
-| Change or create a single record | `d365_data_write` | `d365_write` |
-| Change metadata: add a column, relabel, add an option value, remove a custom layer | `d365_write` (`plan-*` is read-only, `execute` confirms) | Hand-written Web API |
+| Change or create a single record | `d365_data_write` | `d365_metadata_write` |
+| Change metadata: add a column, relabel, add an option value, remove a custom layer | `d365_metadata_write` (`plan-*` is read-only, `execute` confirms) | Hand-written Web API |
 | What does this record look like, how many are there | `d365_data` (`count` / `group` / `sample` / `query`) | `d365_metadata` |
-| A plug-in failed — why | `d365_trace summary` → `get`; run `d365_health` first to rule out async jobs | Guessing the error code |
-| Why is it slow, where does the time go | `d365_perf hotspots` (total) → `slowest` → `d365_trace stages` | Opening trace logs one by one |
+| A plug-in failed — why | `d365_diagnose action=trace-summary` → `action=trace-get`; run `action=health` first to rule out async jobs | Guessing the error code |
+| Why is it slow, where does the time go | `d365_diagnose action=perf-hotspots` (total) → `action=perf-slowest` → `action=trace-stages` | Opening trace logs one by one |
 | Is this table's logic in a cloud flow / which flows touch it | `d365_flows refs` → `show` | Opening each flow in the Power Automate portal |
 | What does this message return right now | `d365_invoke` (GET uses data.read; POST uses message.invoke + data.write and confirms every time) | Assembling it in Postman |
-| Who holds a role / which roles does a user have | `d365_access who-has-role` / `user-roles` (team inheritance listed separately) | Opening users one by one in the UI |
-| What may a role do, on which tables, at what depth | `d365_access role-privileges` (table × eight rights) | Reading the role editor's long list |
+| Who holds a role / which roles does a user have | `d365_roles who-has-role` / `user-roles` (team inheritance listed separately) | Opening users one by one in the UI |
+| What may a role do, on which tables, at what depth | `d365_roles role-privileges` (table × eight rights) | Reading the role editor's long list |
 | Will this MR run in the target environment | `d365_code_check` | Reading the diff by eye |
 | The artifact is too big for the conversation | `d365_reports action=view` (`match` to find one GUID) | Loading the whole file |
 
@@ -41,43 +41,40 @@ Without a scope, `d365_data_sync` previews the whole table and says so; `d365_da
 
 ## d365_envs
 
-Lists environments and whether credentials are complete. Call it before answering "does environment X have Y", so "not configured" is never reported as "not in the environment".
+Which environments exist, whether their credentials are complete, and whether they actually connect. This is also where the environment list is edited: `list` / `save` / `remove` go through the same storage as "Environments" on the settings page, so the UI and the agent always see the same thing.
+
+| `action` | What it does | Connects? |
+| --- | --- | --- |
+| `list` (default) | Inventory: key, display name, URL, credential source, which one is the default | Never |
+| `check` | Really opens a connection and reports the organization name, version and region — or the failure and the missing credential | Yes |
+| `save` | Adds or edits one environment in the local config and secrets file | No |
+| `remove` | Deletes one environment from the local config | No |
+
+`check` without an `environment` checks **every** configured environment; with an environment key it checks only that one. Call it before answering "does environment X have Y", so "not configured" is never reported as "not in the environment".
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `check` | boolean | false | Actually connect to each environment to verify (consumes a few requests) |
+| `action` | `list` \| `check` \| `save` \| `remove` | `list` | |
+| `environment` | string | — | Environment key; required for `save` / `remove`, and selects a single environment for `check` |
+| `url` | string | — | `save`: environment URL |
+| `label` | string | — | `save`: display name |
+| `cloud` | `public` \| `usgovernment` \| `dod` \| `china` | `public` | `save`: cloud |
+| `tenantId` | string | — | `save`: Entra tenant ID |
+| `clientId` | string | — | `save`: application user ClientId |
+| `clientSecret` | string | — | `save`: client secret, written to `d365.secrets.json` |
+| `clearSecret` | boolean | false | `save`: clear the saved secret |
+| `defaultEnvironment` | string | — | `save`: also set it as the default environment |
 
 ```json
-{ "check": true }
-```
-
-Returns: each environment's key, display name, URL, credential source (inline / secrets / env), connectivity and version.
-
----
-
-## d365_configure
-
-Reads and writes the environment list: the same data as "Environments" on the settings page.
-
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `action` | `list` \| `save` \| `remove` \| `check` | Defaults to `list` |
-| `environment` | string | Environment key; required for `save` / `remove` / `check` |
-| `url` | string | `save`: environment URL |
-| `label` | string | `save`: display name |
-| `cloud` | `public` \| `usgovernment` \| `dod` \| `china` | `save`: cloud, default `public` |
-| `tenantId` | string | `save`: Entra tenant ID |
-| `clientId` | string | `save`: application user ClientId |
-| `clientSecret` | string | `save`: client secret, written to `d365.secrets.json` |
-| `clearSecret` | boolean | `save`: clear the saved secret |
-| `defaultEnvironment` | string | `save`: also set it as the default environment |
-
-```json
+{ "action": "list" }
+{ "action": "check" }
+{ "action": "check", "environment": "sit" }
 { "action": "save", "environment": "sit", "url": "https://contoso-sit.crm5.dynamics.com",
   "tenantId": "<tenant-guid>", "clientId": "<client-id>", "clientSecret": "<secret>" }
+{ "action": "remove", "environment": "uat" }
 ```
 
-Note: the secret is written **in plain text** to a local file. Do not paste it into commit history or screenshots.
+`list` never spends a request, and `save` / `remove` only touch the local configuration — none of them needs a permission for the environment itself. Note: the secret is written **in plain text** to a local file. Do not paste it into commit history or screenshots.
 
 ---
 
@@ -125,42 +122,7 @@ A few real constraints:
 
 ---
 
-## d365_layers
-
-Queries `msdyn_componentlayer`: which solutions have overridden a component, the layer order, and which one takes effect.
-
-`msdyn_componentlayer` is a virtual entity (custom data provider): **the component id and the component type must both be supplied**. Supplying only a name, only an id, or nothing at all returns 0 rows (with no error).
-
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `component` | string | Component name or GUID. Entities use the logical name; other types use the name / unique name of that record type; `OptionSet` uses the global option set name |
-| `componentType` | enum | `Entity`, `Attribute`, `SystemForm`, `SavedQuery`, `Workflow`, `WebResource`, `PluginAssembly`, `PluginType`, `SdkMessageProcessingStep`, `CustomAPI`, `OptionSet` |
-| `entity` | string | Required when `componentType=Attribute` |
-| `solution` | string | Look only at one solution's layers (filtered server-side, so a component with more layers than `top` cannot read as "no layer") |
-| `includeJson` | boolean | Also fetch `msdyn_componentjson` (full definition, potentially large, written to a file) |
-| `top` | integer | Maximum records to fetch, default 500 |
-| `environments` / `allEnvironments` | | Compare the active layer across environments |
-
-```json
-{ "component": "account", "componentType": "Entity", "allEnvironments": true }
-{ "componentType": "Attribute", "component": "name", "entity": "account" }
-{ "componentType": "SystemForm", "component": "Account" }
-{ "componentType": "OptionSet", "component": "contoso_taxcategoryos", "allEnvironments": true }
-```
-
-Rows are returned in ascending `msdyn_order`; the last layer is the one currently in effect; `(system layer)` means the layer does not come from any solution.
-
-`Active` is the pseudo solution name Dataverse uses for an **unmanaged customization layer**: when present it always sits on top, covering the managed layers below, and it is the only layer `d365_write plan-remove-layer` can delete. The output therefore labels it `Active (unmanaged)` and states explicitly whether the top layer is unmanaged or whether "this environment has no unmanaged layer" — the latter means the component is fully driven by solutions here. An Active layer's `msdyn_overwritetime` is always `1900-01-01` (the service does not record it), so the timestamp is shown as "not recorded" instead of a fake date.
-
-`OptionSet` resolves **global** option sets only (via `GlobalOptionSetDefinitions(Name='…')` to get the `MetadataId`); local option sets live with their column, so use `componentType=Attribute` plus `entity` to inspect a column's layers. Their layer can be removed too (`d365_write plan-remove-layer` with `componentType: OptionSet`).
-
-In a multi-environment query, an environment that lacks the component (name not found) only reports "this environment does not have this component"; the other environments still return their layers and take part in the comparison. The call only fails when every environment lacks it.
-
-Known limitation: in some environments the table is readable but returns 0 rows; administrator identity is required to see the data.
-
----
-
-## d365_sync
+## d365_snapshot
 
 Pulls environment metadata into a local snapshot.
 
@@ -222,6 +184,41 @@ A row that exists on only one side is reported as added/removed only when the ot
 
 ---
 
+## d365_layers
+
+Queries `msdyn_componentlayer`: which solutions have overridden a component, the layer order, and which one takes effect.
+
+`msdyn_componentlayer` is a virtual entity (custom data provider): **the component id and the component type must both be supplied**. Supplying only a name, only an id, or nothing at all returns 0 rows (with no error).
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `component` | string | Component name or GUID. Entities use the logical name; other types use the name / unique name of that record type; `OptionSet` uses the global option set name |
+| `componentType` | enum | `Entity`, `Attribute`, `SystemForm`, `SavedQuery`, `Workflow`, `WebResource`, `PluginAssembly`, `PluginType`, `SdkMessageProcessingStep`, `CustomAPI`, `OptionSet` |
+| `entity` | string | Required when `componentType=Attribute` |
+| `solution` | string | Look only at one solution's layers (filtered server-side, so a component with more layers than `top` cannot read as "no layer") |
+| `includeJson` | boolean | Also fetch `msdyn_componentjson` (full definition, potentially large, written to a file) |
+| `top` | integer | Maximum records to fetch, default 500 |
+| `environments` / `allEnvironments` | | Compare the active layer across environments |
+
+```json
+{ "component": "account", "componentType": "Entity", "allEnvironments": true }
+{ "componentType": "Attribute", "component": "name", "entity": "account" }
+{ "componentType": "SystemForm", "component": "Account" }
+{ "componentType": "OptionSet", "component": "contoso_taxcategoryos", "allEnvironments": true }
+```
+
+Rows are returned in ascending `msdyn_order`; the last layer is the one currently in effect; `(system layer)` means the layer does not come from any solution.
+
+`Active` is the pseudo solution name Dataverse uses for an **unmanaged customization layer**: when present it always sits on top, covering the managed layers below, and it is the only layer `d365_metadata_write plan-remove-layer` can delete. The output therefore labels it `Active (unmanaged)` and states explicitly whether the top layer is unmanaged or whether "this environment has no unmanaged layer" — the latter means the component is fully driven by solutions here. An Active layer's `msdyn_overwritetime` is always `1900-01-01` (the service does not record it), so the timestamp is shown as "not recorded" instead of a fake date.
+
+`OptionSet` resolves **global** option sets only (via `GlobalOptionSetDefinitions(Name='…')` to get the `MetadataId`); local option sets live with their column, so use `componentType=Attribute` plus `entity` to inspect a column's layers. Their layer can be removed too (`d365_metadata_write plan-remove-layer` with `componentType: OptionSet`).
+
+In a multi-environment query, an environment that lacks the component (name not found) only reports "this environment does not have this component"; the other environments still return their layers and take part in the comparison. The call only fails when every environment lacks it.
+
+Known limitation: in some environments the table is readable but returns 0 rows; administrator identity is required to see the data.
+
+---
+
 ## d365_refs
 
 Reverse lookup of references: "who uses the thing I am about to change or delete".
@@ -249,6 +246,79 @@ Reverse lookup of references: "who uses the thing I am about to change or delete
 The implementation is server-side `contains()` filtering (`formxml` / `layoutxml` / `fetchxml`), so the whole organization is never pulled locally. Full results are in `.d365/query/`.
 
 Limitations: a quick view of forms that reference fields of other entities is out of scope; workflows / business rules are text matches, so dynamically assembled field names can be missed.
+
+---
+
+## d365_contract
+
+Contract matrix and drift: treats upstream plugin registrations and form references as a contract and checks whether downstream still honors it.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `action` | `drift` \| `matrix` \| `waive` \| `waivers` | `drift` | |
+| `source` | string | default environment | Upstream |
+| `targets` | string[] | all except upstream | Downstream |
+| `optionSets` | string[] | — | Global option sets to compare value by value |
+| `includeManaged` | boolean | false | Include managed assemblies in the comparison (noisy) |
+| `forms` | boolean | true | Check the web resources and sitemap referenced by forms |
+| `handlers` | boolean | false | Download scripts to verify Handler functions exist (slow) |
+| `rule` / `env` / `object` / `reason` / `days` | | | For `waive`: rule, environment, object, reason, expiry days (default 30) |
+
+```json
+{ "action": "drift", "source": "dev", "targets": ["sit", "uat"], "forms": false }
+```
+
+```json
+{ "action": "waive", "rule": "form-library-missing", "env": "sit",
+  "object": "/_static/_common/scripts/CommandbarActions.js", "reason": "this environment does not use the SLA dialog", "days": 30 }
+```
+
+The rule table, waivers and trends are in [checks.md](checks.md). Reports are in `.d365/reports/contract-*.md|json`.
+
+---
+
+## d365_migrate
+
+Assesses the migration risk of publishing a solution to other environments.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `action` | `assess` | `assess` | Assessment only, for now |
+| `source` | string | default environment | Source environment |
+| `solution` | string | Required | Solution unique name |
+| `targets` | string[] | all except source | Target environments |
+| `maxComponents` | integer | 150 | Maximum components to assess |
+| `full` | boolean | false | Assess all components (ignores `maxComponents`) |
+| `concurrency` | integer | 4, max 8 | Number of concurrent requests |
+
+```json
+{ "action": "assess", "source": "dev", "solution": "ContosoBase", "targets": ["sit"] }
+```
+
+Results fall into three categories: data risk (option values lost, labels drifted), masking (who sits on top of the target layer, which solutions get covered after import), and missing components and version differences.
+
+Report: `.d365/reports/migration-<solution>-to-<target>-<timestamp>.md` + `.json`. Rule details are in [checks.md](checks.md).
+
+---
+
+## d365_code_check
+
+Reads a GitLab MR once and checks whether the changes will fail to run in the target environment.
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `mergeRequest` | string | Required. MR link or IID (`42` / `!42`) |
+| `project` | string | `group/project`; if omitted, the project from the link is used, and if that is also omitted, the settings page default project |
+| `targets` | string[] | Environments to check against; all if omitted |
+
+```json
+{ "mergeRequest": "https://gitlab.example.com/contoso/powerapps/-/merge_requests/7759/diffs",
+  "targets": ["uat"] }
+```
+
+You must first fill in the URL and a read-only token (`read_api`) under "GitLab" on the settings page; the token's user needs at least the Reporter role.
+
+The output has three parts: blockers, warnings, manual confirmation. Reports are in `.d365/reports/code-check-<MR>-<timestamp>.md`. Rule details are in [checks.md](checks.md).
 
 ---
 
@@ -379,7 +449,137 @@ Behavior and constraints:
 
 ---
 
-## d365_write
+## d365_roles
+
+Read and change Dataverse security roles. The model is three links — role → privilege → table × depth — and this tool opens all three: who holds a role (including people who inherit it through a team), which roles a user has, what a role may do on which tables, and how to change one.
+
+| Parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `action` | see below | required | Read: `roles` / `who-has-role` / `user-roles` / `role-privileges`. Write plans: `plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`. Plan management: `list` / `show` / `cancel` / `execute` |
+| `environment` | string | default env | |
+| `role` | string | — | Role name or `roleid`. The same name exists once per business unit |
+| `businessunit` | string | — | Business unit name or GUID: pins a same-named role to one unit (e.g. `AP`) |
+| `user` | string | — | GUID, `user@contoso.com` or full name. Lookups are fuzzy; writes require one match |
+| `team` | string | — | Team GUID or name; when given, the operation targets a team |
+| `entity` | string | — | `role-privileges` only: restrict to one table, e.g. `account` |
+| `privileges` | array | — | For `plan-add-privileges` / `plan-remove-privileges`: `"prvWriteAccount"` or `{"name":"prvWriteAccount","depth":"global"}` |
+| `name` / `filter` / `top` | | | `roles`: name contains, or a raw OData `$filter`; `top` defaults to 200, max 1000 |
+| `planId` | string | — | `show` / `cancel` / `execute` |
+| `rationale` | string | — | Why the change is made; recorded with the plan and the change log |
+
+```json
+{ "action": "roles", "environment": "dev", "name": "Data Stewards" }
+{ "action": "who-has-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP" }
+{ "action": "user-roles", "environment": "dev", "user": "user@contoso.com" }
+{ "action": "role-privileges", "environment": "dev", "role": "Salesperson", "businessunit": "AP", "entity": "account" }
+{ "action": "plan-assign-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP", "user": "user@contoso.com", "rationale": "join the data governance group" }
+```
+
+How to read the output:
+
+- `who-has-role` separates **direct** holders from people who **inherit** a role through a team. Counting only direct holders loses the team members; counting only the union loses the answer to "why can he see this".
+- `role-privileges` is a table × eight rights grid whose cells are depth words: **User** (only records they own), **Business unit**, **Business unit and below**, **Organization** (the whole environment). An empty cell means the right is absent.
+- Access rights are **bit flags**, not 1..8 ordinals: measured in this org, `prvReadAccount` = 1, `prvWriteAccount` = 2, `prvAppendAccount` = 4, `prvAppendToAccount` = 16, `prvCreateAccount` = 32, `prvDeleteAccount` = 65536, `prvShareAccount` = 262144, `prvAssignAccount` = 524288. The tool translates them into words so you never have to remember these.
+- One privilege can cover several tables (`prvReadAccount` also covers `customeraddress`), so the row count exceeds the privilege count — that is correct, not duplication.
+
+Three things to know before changing anything:
+
+1. **Same-named roles exist once per business unit.** UAT has 16 copies of `Data Stewards`, each with its own privileges. A write must resolve to exactly one: pass `businessunit`, or use a `roleid`; otherwise you get `ambiguous-role` with the candidates listed.
+2. **Writes are two-phase.** `plan-*` is read-only and produces a plan in `.d365/pending-writes/`; `execute` first checks the "Change security roles" capability, then asks for confirmation in the chat, and only then writes. Every operation is recorded in `.d365/changes/`.
+3. **Privilege changes are dangerous.** One mistake can open data to people who should not see it, so `role.admin` is off by default and there is no "bulk by filter" mode — you must name the role, the principal and the privileges explicitly.
+
+Reads need "Read business data" (`data.read`); writes need "Change security roles" (`role.admin`, off by default). `role-privileges` reading thousands of rows is normal: a role usually has 2000–18000 privilege records.
+
+---
+
+## d365_invoke
+
+Calls one Dataverse message (action or function) and returns the HTTP status and response body — to reproduce a failure, or to see what a message actually returns.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `message` | string | — | Required. Message name, e.g. `WinOpportunity`, `contoso_DoSomething` |
+| `method` | `POST` \| `GET` | `POST` | `POST`=action (may carry a body); `GET`=function (parameters go into the URL as OData aliases, cannot bind a record) |
+| `entity` | string | — | Required for a bound action: the record's entity set (`accounts`) |
+| `id` | string | — | Required for a bound action: the record's primary key GUID |
+| `parameters` | object | — | `POST`: the request body (action inputs); `GET`: named function parameters (values are formatted as OData literals) |
+| `environment` | string | default environment | |
+| `rationale` | string | — | Why this message is being called; written to the artifact and the run record |
+
+```json
+{ "message": "RetrieveTotalRecordCount", "method": "GET", "parameters": { "EntityNames": ["account"] } }
+{ "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
+```
+
+**The capability follows the method**: a `GET` function is a read and needs "Read business data" (`data.read`); a `POST` action needs "Call messages" (`message.invoke`, off by default) **and** "Change business data" (`data.write`) — the message is implemented by the target's plug-ins, so it may write data. Every POST asks for confirmation in the chat with the environment, path and body. **A failed call does not throw** — it returns the HTTP status, Dataverse error code and response body verbatim, which is exactly the part you need when reproducing a problem.
+
+---
+
+## d365_flows
+
+Query Power Automate cloud flows. A cloud flow is just a `workflow` row with `category = 5` in Dataverse — same table as classic workflows, same permissions, same authentication. **No Power Automate API permission is involved.**
+
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `action` | `list` \| `show` \| `refs` | `list` | `list` the catalog; `show` one flow's skeleton; `refs` which flows touch a table |
+| `name` | string | — | `show`: flow name (exact match; get it from `list`) |
+| `flowId` | string | — | `show`: `workflowid` (GUID) when the name is duplicated or has odd characters |
+| `entity` | string | — | `refs` requires it: table logical name (`account`, `contoso_determinationlogictable`) |
+| `filter` | string | — | `list`: extra OData `$filter`, e.g. `"statecode eq 1"` for enabled flows |
+| `top` | integer | 50 | `list` row count (max 500) |
+| `scanLimit` | integer | 1000 | `refs`: how many flows to scan at most (max 2000); more flows means paging through `clientdata` |
+| `environment` | string | default env | |
+
+```json
+{ "action": "list", "environment": "dev", "filter": "statecode eq 1", "top": 20 }
+{ "action": "show", "environment": "dev", "name": "Contoso Opportunity Research Flow" }
+{ "action": "refs", "environment": "dev", "entity": "account" }
+```
+
+`show` prints state, managed flag, the trigger (including detail such as "when a record is created or updated, scope: organization, filtering columns: …, condition: …"), action count, tables it touches, connectors, connection references, then a step table (first 40 actions; the rest is in the artifact). Nesting shows as ` > ` in the step path, with `(else)` and `(caseName)` marking branches.
+
+Four things worth knowing:
+
+1. **`primaryentity` is `none` on every flow.** A cloud flow is not bound to one table, so `d365_metadata resource=workflows` cannot tell you which table it touches — the table names live inside each action's parameters in `clientdata`. `refs` parses them all and reverse-looks them up. There is no server-side filter for this, so every definition has to be read.
+2. **Run history is not in Dataverse.** Which run failed, which action it stalled on, how long it took — that only exists on the Power Automate service (`api.flow.microsoft.com`, a separate audience and `Flow.Read.All`). This tool covers the definition layer: what is defined, how it triggers, which tables and connections it uses.
+3. **Flows outside a solution are included.** They sit in the default solution (`ismanaged = false`); `list` finds them and `refs` scans them. Whether they belong in a solution is an ALM question, not a visibility one.
+4. `refs` reports "scanned N of M" — it scans everything up to the cap, and lowering `scanLimit` says so explicitly rather than presenting a truncated scan as "nothing found".
+
+---
+
+## d365_reports
+
+Local artifacts and disk usage.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `action` | `list` \| `view` \| `cleanup` \| `compact` | `list` | |
+| `file` | string | — | For `view`: a path under `.d365` (`query/xxx.json`) or a bare file name |
+| `offset` | integer | 0 | For `view`: first line to show (0-based) |
+| `match` | string | — | For `view`: only lines containing this string (case-insensitive) — the practical way to find one GUID in a big JSON |
+| `wrap` | integer | 400 | For `view`: wrap lines longer than this; 0 means no wrapping |
+| `pretty` | boolean | true for `.json` | For `view`: expand JSON with indentation |
+| `target` | `snapshots` \| `reports` \| `diffs` \| `query` \| `changes` \| `all` | `all` | Scope for `cleanup` |
+| `dryRun` | boolean | **true** | Dry run only; pass `false` after confirming to actually delete |
+| `limit` | integer | 15 / 60 | Entries `list` shows per category; for `view`, lines to show (max 2000) |
+
+```json
+{ "action": "cleanup", "target": "query" }
+{ "action": "cleanup", "target": "query", "dryRun": false }
+{ "action": "compact" }
+{ "action": "view", "file": "query/2026-11-09T04-03-33-467Z-data-count.json" }
+{ "action": "view", "file": "query/layers-uat.json", "match": "contoso_taxcategoryos", "offset": 40 }
+```
+
+`view` reads only files under `.d365`: an absolute path pointing elsewhere is refused instead of quietly read.
+
+Cleanup touches only known subdirectories under `.d365/`, verifying each path prefix before deleting; `waivers.json`, `pending-writes/` and configuration files are never deleted.
+
+`reports` counts **reports**, not files: each analysis writes a `.json` + `.md` pair, so counting files made "keep 20" retain ten reports.
+
+---
+
+## d365_metadata_write
 
 Metadata changes. **`plan-*` actions are read-only** and only produce a plan; `execute` writes only after a confirmation card is approved in the conversation.
 
@@ -465,70 +665,48 @@ Write details, confirmation cards and publish scope are covered in [permissions.
 
 ---
 
-## d365_migrate
+## d365_diagnose
 
-Assesses the migration risk of publishing a solution to other environments.
+Runtime diagnosis in three groups behind one `action`: is the environment busy (`health`), what failed and why (`trace-*`), and where the time goes (`perf-*`). All of them read business data — `plugintracelogs`, `asyncoperation` and friends — so they need "Read business data" (`data.read`).
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `action` | `assess` | `assess` | Assessment only, for now |
-| `source` | string | default environment | Source environment |
-| `solution` | string | Required | Solution unique name |
-| `targets` | string[] | all except source | Target environments |
-| `maxComponents` | integer | 150 | Maximum components to assess |
-| `full` | boolean | false | Assess all components (ignores `maxComponents`) |
-| `concurrency` | integer | 4, max 8 | Number of concurrent requests |
-
-```json
-{ "action": "assess", "source": "dev", "solution": "ContosoBase", "targets": ["sit"] }
-```
-
-Results fall into three categories: data risk (option values lost, labels drifted), masking (who sits on top of the target layer, which solutions get covered after import), and missing components and version differences.
-
-Report: `.d365/reports/migration-<solution>-to-<target>-<timestamp>.md` + `.json`. Rule details are in [checks.md](checks.md).
-
----
-
-## d365_contract
-
-Contract matrix and drift: treats upstream plugin registrations and form references as a contract and checks whether downstream still honors it.
+| `action` | Answers |
+| --- | --- |
+| `health` | Should I touch this environment right now |
+| `trace-list` | Which traces are in the window |
+| `trace-get` | What exactly does one trace contain |
+| `trace-summary` | Which failures repeat, grouped as signatures |
+| `trace-stages` | Where did one call spend its time |
+| `perf-hotspots` | Where does the time go, aggregated |
+| `perf-slowest` | Which single calls were slowest |
+| `perf-trend` | How does it change hour by hour / day by day |
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `action` | `drift` \| `matrix` \| `waive` \| `waivers` | `drift` | |
-| `source` | string | default environment | Upstream |
-| `targets` | string[] | all except upstream | Downstream |
-| `optionSets` | string[] | — | Global option sets to compare value by value |
-| `includeManaged` | boolean | false | Include managed assemblies in the comparison (noisy) |
-| `forms` | boolean | true | Check the web resources and sitemap referenced by forms |
-| `handlers` | boolean | false | Download scripts to verify Handler functions exist (slow) |
-| `rule` / `env` / `object` / `reason` / `days` | | | For `waive`: rule, environment, object, reason, expiry days (default 30) |
+| `action` | one of the eight above | Required | |
+| `traceId` | string | — | `trace-get` / `trace-stages`: the `plugintracelogid` (usually from `trace-list`, or the `trace` column of `perf-slowest`) |
+| `hours` | number | 24 (`health`, `trace-*`); 72 (`perf-*`) | Look-back window in hours; `trace-*` max 720, `perf-*` max 720 |
+| `entity` | string | — | `trace-*` / `perf-*`: only traces on one table (`primaryentity`, e.g. `account`) |
+| `typename` | string | — | `trace-*` / `perf-*`: only one plug-in type; contains is supported, e.g. `ContactSearch` |
+| `message` | string | — | `trace-*` / `perf-*`: only one message (`messagename`, e.g. `Create`) |
+| `exceptionOnly` | boolean | **true** | `trace-*`: only traces that threw. Pass `false` to include successful runs |
+| `includeConfig` | boolean | false | `trace-get`: also return `configuration` / `secureconfiguration` / `profile` (off by default; those fields can hold plaintext secrets) |
+| `top` | integer | 20 | `trace-list` rows (max 200); `trace-summary` sample size (default 300, max 500); `perf-*` rows / groups (default 20, max 100) |
+| `minDuration` | number | — | `perf-*`: only calls at least this many milliseconds |
+| `filter` | string | — | `perf-*`: extra `$filter` |
+| `bucket` | `hour` \| `day` | `hour` | `perf-trend`: bucket size |
+| `environment` | string | default environment | `trace-*` / `perf-*` |
+| `environments` | string[] | — | Any action: query several environments |
+| `allEnvironments` | boolean | false | Any action: every configured environment |
+
+`health` selects environments with `environments` / `allEnvironments`; a single `environment` key belongs to `trace-*` / `perf-*`.
+
+### action=health
+
+Environment health: "is it safe to touch this environment right now". `hours` (default 24) is the lookback for failed jobs.
 
 ```json
-{ "action": "drift", "source": "dev", "targets": ["sit", "uat"], "forms": false }
-```
-
-```json
-{ "action": "waive", "rule": "form-library-missing", "env": "sit",
-  "object": "/_static/_common/scripts/CommandbarActions.js", "reason": "this environment does not use the SLA dialog", "days": 30 }
-```
-
-The rule table, waivers and trends are in [checks.md](checks.md). Reports are in `.d365/reports/contract-*.md|json`.
-
----
-
-## d365_health
-
-Environment health: "is it safe to touch this environment right now".
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `environments` | string[] | default environment | |
-| `allEnvironments` | boolean | false | |
-| `hours` | integer | 24 | Lookback hours for failed jobs |
-
-```json
-{ "allEnvironments": true, "hours": 24 }
+{ "action": "health", "allEnvironments": true, "hours": 24 }
+{ "action": "health", "environments": ["sit"] }
 ```
 
 Per environment it reports: version, organization name, queued (Ready) jobs, suspended jobs, recent failure count (merged by job name), solutions currently importing / publishing, recently installed solutions, and the **plug-in trace level** (organization `plugintracelogsetting`: off / exception only / all).
@@ -539,217 +717,36 @@ The same "importing / publishing" determination is reused by the pre-write check
 
 Missing job data never reads as zero: if an environment has not granted "Read business data", the queued / suspended / failed columns show `—` and the table states why. It used to be swallowed into "0 failures", which is a false all-clear exactly when you are investigating.
 
----
-
-## d365_reports
-
-Local artifacts and disk usage.
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `action` | `list` \| `view` \| `cleanup` \| `compact` | `list` | |
-| `file` | string | — | For `view`: a path under `.d365` (`query/xxx.json`) or a bare file name |
-| `offset` | integer | 0 | For `view`: first line to show (0-based) |
-| `match` | string | — | For `view`: only lines containing this string (case-insensitive) — the practical way to find one GUID in a big JSON |
-| `wrap` | integer | 400 | For `view`: wrap lines longer than this; 0 means no wrapping |
-| `pretty` | boolean | true for `.json` | For `view`: expand JSON with indentation |
-| `target` | `snapshots` \| `reports` \| `diffs` \| `query` \| `changes` \| `all` | `all` | Scope for `cleanup` |
-| `dryRun` | boolean | **true** | Dry run only; pass `false` after confirming to actually delete |
-| `limit` | integer | 15 / 60 | Entries `list` shows per category; for `view`, lines to show (max 2000) |
-
-```json
-{ "action": "cleanup", "target": "query" }
-{ "action": "cleanup", "target": "query", "dryRun": false }
-{ "action": "compact" }
-{ "action": "view", "file": "query/2026-11-09T04-03-33-467Z-data-count.json" }
-{ "action": "view", "file": "query/layers-uat.json", "match": "contoso_taxcategoryos", "offset": 40 }
-```
-
-`view` reads only files under `.d365`: an absolute path pointing elsewhere is refused instead of quietly read.
-
-Cleanup touches only known subdirectories under `.d365/`, verifying each path prefix before deleting; `waivers.json`, `pending-writes/` and configuration files are never deleted.
-
-`reports` counts **reports**, not files: each analysis writes a `.json` + `.md` pair, so counting files made "keep 20" retain ten reports.
-
----
-
-## d365_invoke
-
-Calls one Dataverse message (action or function) and returns the HTTP status and response body — to reproduce a failure, or to see what a message actually returns.
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `message` | string | — | Required. Message name, e.g. `WinOpportunity`, `contoso_DoSomething` |
-| `method` | `POST` \| `GET` | `POST` | `POST`=action (may carry a body); `GET`=function (parameters go into the URL as OData aliases, cannot bind a record) |
-| `entity` | string | — | Required for a bound action: the record's entity set (`accounts`) |
-| `id` | string | — | Required for a bound action: the record's primary key GUID |
-| `parameters` | object | — | `POST`: the request body (action inputs); `GET`: named function parameters (values are formatted as OData literals) |
-| `environment` | string | default environment | |
-| `rationale` | string | — | Why this message is being called; written to the artifact and the run record |
-
-```json
-{ "message": "RetrieveTotalRecordCount", "method": "GET", "parameters": { "EntityNames": ["account"] } }
-{ "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
-```
-
-**The capability follows the method**: a `GET` function is a read and needs "Read business data" (`data.read`); a `POST` action needs "Call messages" (`message.invoke`, off by default) **and** "Change business data" (`data.write`) — the message is implemented by the target's plug-ins, so it may write data. Every POST asks for confirmation in the chat with the environment, path and body. **A failed call does not throw** — it returns the HTTP status, Dataverse error code and response body verbatim, which is exactly the part you need when reproducing a problem.
-
----
-
-## d365_trace
+### action=trace-*
 
 Reads plug-in trace logs: who ran, for how long, and why it threw.
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `action` | `list` \| `get` \| `summary` \| `stages` | `list` | |
-| `traceId` | string | — | Required for `get` / `stages`: the `plugintracelogid` (usually from `list`) |
-| `hours` | number | 24 | Look-back window in hours |
-| `entity` | string | — | Only traces on one table (`primaryentity`, e.g. `account`) |
-| `typename` | string | — | Only one plug-in type; contains is supported, e.g. `ContactSearch` |
-| `message` | string | — | Only one message (`messagename`, e.g. `Create`) |
-| `exceptionOnly` | boolean | **true** | Default: only traces that threw. Pass `false` to include successful runs |
-| `includeConfig` | boolean | false | `get`: also return `configuration` / `secureconfiguration` / `profile` (off by default; those fields can hold plaintext secrets) |
-| `top` | integer | 20 | `list` rows (max 200); `summary` sample size (default 300, max 500) |
-| `environment` / `environments` / `allEnvironments` | | Environment selection |
-
 ```json
-{ "action": "summary", "environment": "sit", "hours": 168 }
-{ "action": "list", "entity": "contact", "message": "Create", "hours": 48 }
-{ "action": "get", "traceId": "44444444-4444-4444-4444-444444444444" }
-{ "action": "stages", "traceId": "44444444-4444-4444-4444-444444444444" }
+{ "action": "trace-summary", "environment": "sit", "hours": 168 }
+{ "action": "trace-list", "entity": "contact", "message": "Create", "hours": 48 }
+{ "action": "trace-get", "traceId": "44444444-4444-4444-4444-444444444444" }
+{ "action": "trace-stages", "traceId": "44444444-4444-4444-4444-444444444444" }
 ```
 
 Four things worth knowing:
 
 1. **A successful trace stores an empty string, not null.** Filtering on `exceptiondetails ne null` alone lists clean runs as failures, so "failures only" is `ne null` and `ne ''`.
-2. `summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
-3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). All four actions — `list`, `get`, `summary` and `stages` — mask them as `***` in both the output and the artifact and tell you how many values they masked. **Traces count as business data** and need "Read business data" (`data.read`).
-4. `stages` works only from timestamps the plug-in wrote into its own message block (`Time Stamp:- 11/16/2026 06:10:25` or `06:10:25.123`). It sorts the gaps and names the widest one, so it answers "which stage took the time", never "why that stage is slow". When fewer than two timestamps exist it says so instead of printing an empty table.
+2. `trace-summary` groups by plug-in type + message + entity + the first line of the exception. Three hundred failures usually collapse to a handful of signatures; the same signature means the same bug recurring.
+3. Plug-ins write their own credentials into the message block (`ClientSecret` inside `secureConfig`). All four actions — `trace-list`, `trace-get`, `trace-summary` and `trace-stages` — mask them as `***` in both the output and the artifact and tell you how many values they masked. **Traces count as business data** and need "Read business data" (`data.read`).
+4. `trace-stages` works only from timestamps the plug-in wrote into its own message block (`Time Stamp:- 11/16/2026 06:10:25` or `06:10:25.123`). It sorts the gaps and names the widest one, so it answers "which stage took the time", never "why that stage is slow". When fewer than two timestamps exist it says so instead of printing an empty table.
 
----
+### action=perf-*
 
-## d365_perf
-
-Aggregates plug-in duration: which plug-ins the time goes to (`hotspots`), which single calls were slowest (`slowest`), and how it changes hour by hour (`trend`). Same `plugintracelogs` source, so it also needs "Read business data" (`data.read`).
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `action` | `hotspots` \| `slowest` \| `trend` | — | Required |
-| `hours` | number | 72 | Look-back window, max 720 |
-| `entity` | string | — | Only one table (`primaryentity`) |
-| `typename` | string | — | Only one plug-in type; contains is supported, e.g. `ContactSearch` |
-| `message` | string | — | Only one message (`Create` / `Update` …) |
-| `minDuration` | number | — | Only calls at least this many milliseconds |
-| `filter` | string | — | Extra `$filter` |
-| `top` | integer | 20 | Rows / groups to return, max 100 |
-| `bucket` | `hour` \| `day` | `hour` | Bucket size for `trend` |
-| `environment` / `environments` / `allEnvironments` | | Environment selection |
+Aggregates plug-in duration: which plug-ins the time goes to (`perf-hotspots`), which single calls were slowest (`perf-slowest`), and how it changes hour by hour (`perf-trend`). Same `plugintracelogs` source, so it also needs "Read business data" (`data.read`). Each aggregate row carries count, total, p50, p95 and max.
 
 ```json
-{ "action": "hotspots", "environment": "dev", "hours": 168, "top": 10 }
-{ "action": "slowest", "environment": "dev", "entity": "account", "top": 5 }
-{ "action": "trend", "environment": "dev", "hours": 72, "bucket": "hour" }
+{ "action": "perf-hotspots", "environment": "dev", "hours": 168, "top": 10 }
+{ "action": "perf-slowest", "environment": "dev", "entity": "account", "top": 5 }
+{ "action": "perf-trend", "environment": "dev", "hours": 72, "bucket": "hour" }
 ```
 
 Three things worth knowing:
 
-1. **`hotspots` sorts by total, so it answers "where did the time go", not "what was slowest".** One two-minute call and seventy-eight 1.5-second calls can tie on total; use `hotspots` for the budget, `slowest` for the worst single call.
+1. **`perf-hotspots` sorts by total, so it answers "where did the time go", not "what was slowest".** One two-minute call and seventy-eight 1.5-second calls can tie on total; use `perf-hotspots` for the budget, `perf-slowest` for the worst single call.
 2. The sample is capped at 5000 rows, and the output always states the window, the sample size and the **trace level**. When tracing is off or "exceptions only", successful calls are not logged at all and the distribution only covers what was recorded — it says so rather than printing a table that looks complete.
-3. The `trace` column from `slowest` is the `plugintracelogid`: feed it to `d365_trace action=stages` to break one call into its own timestamp gaps.
-
----
-
-## d365_flows
-
-Query Power Automate cloud flows. A cloud flow is just a `workflow` row with `category = 5` in Dataverse — same table as classic workflows, same permissions, same authentication. **No Power Automate API permission is involved.**
-
-| Parameter | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `action` | `list` \| `show` \| `refs` | `list` | `list` the catalog; `show` one flow's skeleton; `refs` which flows touch a table |
-| `name` | string | — | `show`: flow name (exact match; get it from `list`) |
-| `flowId` | string | — | `show`: `workflowid` (GUID) when the name is duplicated or has odd characters |
-| `entity` | string | — | `refs` requires it: table logical name (`account`, `contoso_determinationlogictable`) |
-| `filter` | string | — | `list`: extra OData `$filter`, e.g. `"statecode eq 1"` for enabled flows |
-| `top` | integer | 50 | `list` row count (max 500) |
-| `scanLimit` | integer | 1000 | `refs`: how many flows to scan at most (max 2000); more flows means paging through `clientdata` |
-| `environment` | string | default env | |
-
-```json
-{ "action": "list", "environment": "dev", "filter": "statecode eq 1", "top": 20 }
-{ "action": "show", "environment": "dev", "name": "Contoso Opportunity Research Flow" }
-{ "action": "refs", "environment": "dev", "entity": "account" }
-```
-
-`show` prints state, managed flag, the trigger (including detail such as "when a record is created or updated, scope: organization, filtering columns: …, condition: …"), action count, tables it touches, connectors, connection references, then a step table (first 40 actions; the rest is in the artifact). Nesting shows as ` > ` in the step path, with `(else)` and `(caseName)` marking branches.
-
-Four things worth knowing:
-
-1. **`primaryentity` is `none` on every flow.** A cloud flow is not bound to one table, so `d365_metadata resource=workflows` cannot tell you which table it touches — the table names live inside each action's parameters in `clientdata`. `refs` parses them all and reverse-looks them up. There is no server-side filter for this, so every definition has to be read.
-2. **Run history is not in Dataverse.** Which run failed, which action it stalled on, how long it took — that only exists on the Power Automate service (`api.flow.microsoft.com`, a separate audience and `Flow.Read.All`). This tool covers the definition layer: what is defined, how it triggers, which tables and connections it uses.
-3. **Flows outside a solution are included.** They sit in the default solution (`ismanaged = false`); `list` finds them and `refs` scans them. Whether they belong in a solution is an ALM question, not a visibility one.
-4. `refs` reports "scanned N of M" — it scans everything up to the cap, and lowering `scanLimit` says so explicitly rather than presenting a truncated scan as "nothing found".
-
----
-
-## d365_access
-
-Read and change Dataverse security roles. The model is three links — role → privilege → table × depth — and this tool opens all three: who holds a role (including people who inherit it through a team), which roles a user has, what a role may do on which tables, and how to change one.
-
-| Parameter | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `action` | see below | required | Read: `roles` / `who-has-role` / `user-roles` / `role-privileges`. Write plans: `plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`. Plan management: `list` / `show` / `cancel` / `execute` |
-| `environment` | string | default env | |
-| `role` | string | — | Role name or `roleid`. The same name exists once per business unit |
-| `businessunit` | string | — | Business unit name or GUID: pins a same-named role to one unit (e.g. `AP`) |
-| `user` | string | — | GUID, `user@contoso.com` or full name. Lookups are fuzzy; writes require one match |
-| `team` | string | — | Team GUID or name; when given, the operation targets a team |
-| `entity` | string | — | `role-privileges` only: restrict to one table, e.g. `account` |
-| `privileges` | array | — | For `plan-add-privileges` / `plan-remove-privileges`: `"prvWriteAccount"` or `{"name":"prvWriteAccount","depth":"global"}` |
-| `name` / `filter` / `top` | | | `roles`: name contains, or a raw OData `$filter`; `top` defaults to 200, max 1000 |
-| `planId` | string | — | `show` / `cancel` / `execute` |
-| `rationale` | string | — | Why the change is made; recorded with the plan and the change log |
-
-```json
-{ "action": "roles", "environment": "dev", "name": "Data Stewards" }
-{ "action": "who-has-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP" }
-{ "action": "user-roles", "environment": "dev", "user": "user@contoso.com" }
-{ "action": "role-privileges", "environment": "dev", "role": "Salesperson", "businessunit": "AP", "entity": "account" }
-{ "action": "plan-assign-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP", "user": "user@contoso.com", "rationale": "join the data governance group" }
-```
-
-How to read the output:
-
-- `who-has-role` separates **direct** holders from people who **inherit** a role through a team. Counting only direct holders loses the team members; counting only the union loses the answer to "why can he see this".
-- `role-privileges` is a table × eight rights grid whose cells are depth words: **User** (only records they own), **Business unit**, **Business unit and below**, **Organization** (the whole environment). An empty cell means the right is absent.
-- Access rights are **bit flags**, not 1..8 ordinals: measured in this org, `prvReadAccount` = 1, `prvWriteAccount` = 2, `prvAppendAccount` = 4, `prvAppendToAccount` = 16, `prvCreateAccount` = 32, `prvDeleteAccount` = 65536, `prvShareAccount` = 262144, `prvAssignAccount` = 524288. The tool translates them into words so you never have to remember these.
-- One privilege can cover several tables (`prvReadAccount` also covers `customeraddress`), so the row count exceeds the privilege count — that is correct, not duplication.
-
-Three things to know before changing anything:
-
-1. **Same-named roles exist once per business unit.** UAT has 16 copies of `Data Stewards`, each with its own privileges. A write must resolve to exactly one: pass `businessunit`, or use a `roleid`; otherwise you get `ambiguous-role` with the candidates listed.
-2. **Writes are two-phase.** `plan-*` is read-only and produces a plan in `.d365/pending-writes/`; `execute` first checks the "Change security roles" capability, then asks for confirmation in the chat, and only then writes. Every operation is recorded in `.d365/changes/`.
-3. **Privilege changes are dangerous.** One mistake can open data to people who should not see it, so `role.admin` is off by default and there is no "bulk by filter" mode — you must name the role, the principal and the privileges explicitly.
-
-Reads need "Read business data" (`data.read`); writes need "Change security roles" (`role.admin`, off by default). `role-privileges` reading thousands of rows is normal: a role usually has 2000–18000 privilege records.
-
----
-
-## d365_code_check
-
-Reads a GitLab MR once and checks whether the changes will fail to run in the target environment.
-
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `mergeRequest` | string | Required. MR link or IID (`42` / `!42`) |
-| `project` | string | `group/project`; if omitted, the project from the link is used, and if that is also omitted, the settings page default project |
-| `targets` | string[] | Environments to check against; all if omitted |
-
-```json
-{ "mergeRequest": "https://gitlab.example.com/contoso/powerapps/-/merge_requests/7759/diffs",
-  "targets": ["uat"] }
-```
-
-You must first fill in the URL and a read-only token (`read_api`) under "GitLab" on the settings page; the token's user needs at least the Reporter role.
-
-The output has three parts: blockers, warnings, manual confirmation. Reports are in `.d365/reports/code-check-<MR>-<timestamp>.md`. Rule details are in [checks.md](checks.md).
+3. The `trace` column from `perf-slowest` is the `plugintracelogid`: feed it to `d365_diagnose action=trace-stages` to break one call into its own timestamp gaps.

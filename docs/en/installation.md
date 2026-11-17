@@ -20,7 +20,7 @@ A read-only application user is enough; for the write capabilities, messages suc
 ### Option 1: install from npm (shortest)
 
 ```bash
-plugin_manager install_bundle target="dsh-d365-kit@0.36.1"
+plugin_manager install_bundle target="dsh-d365-kit@0.37.0"
 ```
 
 Works once the package is published to the registry pnpm is configured against â€” public npm or an internal mirror. The package has no scope, so no scope mapping is needed. To install a specific version pin it as `dsh-d365-kit@<version>`.
@@ -30,7 +30,7 @@ Works once the package is published to the registry pnpm is configured against â
 ### Option 2: install from Git (no registry needed)
 
 ```bash
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.37.0"
 ```
 
 DSH pulls the package from git with pnpm. After installing, check:
@@ -117,18 +117,18 @@ Tokens are cached in process memory and keyed by a fingerprint of "URL + tenant 
 ## Verification
 
 ```
-d365_envs check=true
+d365_envs action=check
 d365_metadata resource=entities top=3
 ```
 
-If both return content, it works. The first `d365_sync` pulls the full metadata (about 125 MB, three minutes on a real environment); if you would rather not use the disk, skip it and query on demand with `d365_metadata`.
+If both return content, it works. The first `d365_snapshot` pulls the full metadata (about 125 MB, three minutes on a real environment); if you would rather not use the disk, skip it and query on demand with `d365_metadata`.
 
 ## Upgrade
 
 ```bash
 # installed from Git
 plugin_manager remove_bundle target=dsh-d365-kit
-plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.36.1"
+plugin_manager install_bundle target="git+https://<your-git>/<group>/dsh-d365-kit.git#v0.37.0"
 ```
 
 After changing the version number you must **remove first, then install**: link/pnpm returns `already-installed` when it believes the package exists, and does not replace the code.

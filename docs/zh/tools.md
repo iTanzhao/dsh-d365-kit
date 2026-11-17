@@ -2,36 +2,36 @@
 
 **[English](../en/tools.md)** | 简体中文
 
-21 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
+18 个工具，全部以 `d365_` 开头。返回一律是「摘要 + 文件路径」：正文太长时落文件，对话里只给结论与位置。
 
 约定：
 
 - **环境参数**：`environment`（单个）、`environments`（数组）、`allEnvironments`（全部）。省略时用配置的默认环境。
-- **只读与写入**：只有 `d365_write execute`、`d365_data_write`、`d365_data_sync execute`、`d365_invoke`（POST）、`d365_access execute` 会改环境，且必须人在确认卡片上批准。
+- **只读与写入**：只有 `d365_metadata_write execute`、`d365_data_write`、`d365_data_sync execute`、`d365_invoke`（POST）、`d365_roles execute` 会改环境，且必须人在确认卡片上批准。
 - **产物**：`<工作区>/.d365/`。返回里给的是**绝对路径**，可直接用文件工具打开。
 
 ## 按问题查
 
 | 你手上是这个问题 | 用这个 | 不要用 |
 | --- | --- | --- |
-| 这个环境里到底有什么、版本多少 | `d365_envs`（`check` 真连） | 直接猜 URL |
+| 这个环境里到底有什么、版本多少 | `d365_envs action=check` | 直接猜 URL |
 | 这张表有哪些字段、某个字段的类型/默认值 | `d365_metadata resource=attributes`（派生列先用 `cast`） | `d365_data` |
 | 这个字段为什么在表单上没有 / 改了不生效 | `d365_refs kind=field`（谁在用）+ `d365_layers`（谁覆盖） | 只看 `attributes` |
-| 两个环境差在哪 | `d365_sync` 两边各拉一份 → `d365_diff` | 两边各查一遍对眼 |
+| 两个环境差在哪 | `d365_snapshot` 两边各拉一份 → `d365_diff` | 两边各查一遍对眼 |
 | 目标环境缺哪个程序集、类型、步骤 | `d365_contract drift`（含版本更旧、表单库、站点地图） | 翻 `plugin_steps` 5000 行 |
 | 这个表 / 这个选项集被哪些解决方案盖过 | `d365_layers` | `d365_metadata solutions` |
 | 组件在不在目标环境、导入会不会覆盖别人的层 | `d365_migrate` | `d365_diff` |
 | 把 DEV 的一批记录复制到 SIT | `d365_data_sync plan` → `execute`（保持 GUID、lookup 解析、确认卡） | `d365_data_write` 逐条手抄 |
 | 改一批已存在记录的某个字段 | `d365_data_sync plan-update` → `execute` | `d365_data_write` 一条一张卡 |
-| 改一条记录 / 新建一条 | `d365_data_write` | `d365_write` |
-| 改元数据：加字段、改显示名、加选项值、移除自定义层 | `d365_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
+| 改一条记录 / 新建一条 | `d365_data_write` | `d365_metadata_write` |
+| 改元数据：加字段、改显示名、加选项值、移除自定义层 | `d365_metadata_write`（`plan-*` 只读，`execute` 确认） | 手写 Web API |
 | 这条记录长什么样、有多少条 | `d365_data`（`count` / `group` / `sample` / `query`） | `d365_metadata` |
-| 插件报错了，为什么 | `d365_trace summary` → `get`；先 `d365_health` 排除异步作业 | 猜错误码 |
-| 为什么慢、时间花在哪 | `d365_perf hotspots`（合计）→ `slowest` → `d365_trace stages` | 逐条打开跟踪日志 |
+| 插件报错了，为什么 | `d365_diagnose action=trace-summary` → `action=trace-get`；先 `action=health` 排除异步作业 | 猜错误码 |
+| 为什么慢、时间花在哪 | `d365_diagnose action=perf-hotspots`（合计）→ `action=perf-slowest` → `action=trace-stages` | 逐条打开跟踪日志 |
 | 这条表的逻辑是不是在云流里 / 哪些 flow 会碰这张表 | `d365_flows refs` → `show` | 在 Power Automate 门户里逐条点开 |
 | 这条消息现在返回什么 | `d365_invoke`（GET 走 data.read，POST 走 message.invoke 且每次确认） | Postman 手拼 |
-| 谁有某个角色 / 某个用户有哪些角色 | `d365_access who-has-role` / `user-roles`（团队继承单独列） | 在 UI 里逐个用户点开 |
-| 某个角色能改哪些表、什么深度 | `d365_access role-privileges`（表 × 八种权限） | 看角色编辑器的长列表 |
+| 谁有某个角色 / 某个用户有哪些角色 | `d365_roles who-has-role` / `user-roles`（团队继承单独列） | 在 UI 里逐个用户点开 |
+| 某个角色能改哪些表、什么深度 | `d365_roles role-privileges`（表 × 八种权限） | 看角色编辑器的长列表 |
 | 这个 MR 会不会跑不起来 | `d365_code_check` | 肉眼看 diff |
 | 产物太大，对话里看不全 | `d365_reports action=view`（`match` 找一条 GUID） | 让文件工具全量读 |
 
@@ -41,43 +41,42 @@
 
 ## d365_envs
 
-列出环境、凭据是否齐全。回答「某环境里有没有 X」之前先用它，避免把「没配置」误说成「环境里没有」。
+列出环境、凭据是否齐全，也在这里改环境清单：`list` / `save` / `remove` 与设置页「环境」走同一份存储，界面和 agent 看到的一定一致。
+
+| `action` | 做什么 | 真连吗 |
+| --- | --- | --- |
+| `list`（默认） | 清单：key、显示名、URL、凭据来源、哪个是默认环境 | 不连 |
+| `check` | 真实连一次，给出组织名、版本、区域；失败时给出原因与缺少的凭据 | 连 |
+| `save` | 在本机配置与密钥文件里新增或修改一个环境 | 不连 |
+| `remove` | 从本机配置里删掉一个环境 | 不连 |
+
+`check` 不带 `environment` 就检查**全部**已配置环境；带环境 key 时只检查那一个。回答「某环境里有没有 X」之前先用它，避免把「没配置」误说成「环境里没有」。
 
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `check` | boolean | false | 真实连接每个环境验证（消耗少量请求） |
+| `action` | `list` \| `check` \| `save` \| `remove` | `list` | |
+| `environment` | string | — | 环境 key；`save` / `remove` 必填，`check` 用它指定单个环境 |
+| `url` | string | — | `save`：环境 URL |
+| `label` | string | — | `save`：显示名 |
+| `cloud` | `public` \| `usgovernment` \| `dod` \| `china` | `public` | `save`：云 |
+| `tenantId` | string | — | `save`：Entra 租户 ID |
+| `clientId` | string | — | `save`：应用用户 ClientId |
+| `clientSecret` | string | — | `save`：客户端密钥，写进 `d365.secrets.json` |
+| `clearSecret` | boolean | false | `save`：清掉已保存的密钥 |
+| `defaultEnvironment` | string | — | `save`：同时设为默认环境 |
 
 ```json
-{ "check": true }
-```
-
-返回：每个环境的 key、显示名、URL、凭据来源（inline / secrets / env）、连通性与版本号。
-
----
-
-## d365_configure
-
-读写环境清单：与设置页「环境」是同一份数据。
-
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `action` | `list` \| `save` \| `remove` \| `check` | 默认 `list` |
-| `environment` | string | 环境 key；`save` / `remove` / `check` 必填 |
-| `url` | string | `save`：环境 URL |
-| `label` | string | `save`：显示名 |
-| `cloud` | `public` \| `usgovernment` \| `dod` \| `china` | `save`：云，默认 `public` |
-| `tenantId` | string | `save`：Entra 租户 ID |
-| `clientId` | string | `save`：应用用户 ClientId |
-| `clientSecret` | string | `save`：客户端密钥，写进 `d365.secrets.json` |
-| `clearSecret` | boolean | `save`：清掉已保存的密钥 |
-| `defaultEnvironment` | string | `save`：同时设为默认环境 |
-
-```json
+{ "action": "list" }
+{ "action": "check" }
+{ "action": "check", "environment": "sit" }
 { "action": "save", "environment": "sit", "url": "https://contoso-sit.crm5.dynamics.com",
   "tenantId": "<tenant-guid>", "clientId": "<client-id>", "clientSecret": "<secret>" }
+{ "action": "remove", "environment": "uat" }
 ```
 
-注意：密钥是**明文**写入本机文件，不要把它粘进提交记录或截图。
+`list` 一个请求都不花，`save` / `remove` 只动本机配置——三者都不需要环境本身的任何权限。注意：密钥是**明文**写入本机文件，不要把它粘进提交记录或截图。
+
+返回：每个环境的 key、显示名、URL、凭据来源（inline / secrets / env）、连通性与版本号。
 
 ---
 
@@ -125,42 +124,7 @@
 
 ---
 
-## d365_layers
-
-查 `msdyn_componentlayer`：组件被哪些解决方案覆盖过、层顺序、谁生效。
-
-`msdyn_componentlayer` 是虚拟实体（自定义数据提供程序）：**必须同时给组件 id 和组件类型**。只给名字、只给 id、什么都不给都会返回 0 行（不报错）。
-
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `component` | string | 组件名或 GUID。Entity 用逻辑名；其它类型用该类记录的名称/唯一名；`OptionSet` 用全局选项集名称 |
-| `componentType` | enum | `Entity`、`Attribute`、`SystemForm`、`SavedQuery`、`Workflow`、`WebResource`、`PluginAssembly`、`PluginType`、`SdkMessageProcessingStep`、`CustomAPI`、`OptionSet` |
-| `entity` | string | `componentType=Attribute` 时必填 |
-| `solution` | string | 只看某个解决方案的层（服务端过滤，不会因为层数超过 `top` 而误报「没有层」） |
-| `includeJson` | boolean | 同时取 `msdyn_componentjson`（完整定义，可能很大，写文件） |
-| `top` | integer | 最多取多少条，默认 500 |
-| `environments` / `allEnvironments` | | 跨环境对比活动层 |
-
-```json
-{ "component": "account", "componentType": "Entity", "allEnvironments": true }
-{ "componentType": "Attribute", "component": "name", "entity": "account" }
-{ "componentType": "SystemForm", "component": "Account" }
-{ "componentType": "OptionSet", "component": "contoso_taxcategoryos", "allEnvironments": true }
-```
-
-返回按 `msdyn_order` 升序，最后一层是当前生效层；`（系统层）` 表示该层不来自任何解决方案。
-
-`Active` 是 Dataverse 给**未受管的自定义层**用的伪解决方案名：它存在时永远在最上面，盖住下面的受管层，也是唯一可以用 `d365_write plan-remove-layer` 删掉的一层。因此输出里会标成 `Active（未受管）`，并单独说明「最上层是未受管层」还是「该环境没有未受管层」——后者表示这个组件在这里完全跟着解决方案走。Active 层的 `msdyn_overwritetime` 恒为 `1900-01-01`（服务端不记录），更新时间显示为「不记录」而不是一个假的日期。
-
-`OptionSet` 只解析**全局**选项集（走 `GlobalOptionSetDefinitions(Name='…')` 取 `MetadataId`）；本地选项集随字段存在，用 `componentType=Attribute` + `entity` 查字段的层。选项集也可以删层（`d365_write plan-remove-layer`，`componentType: OptionSet`）。
-
-多环境查询时，某个环境没有该组件（按名称找不到）只会让**该环境**报「该环境没有这个组件」，其它环境照常返回并参与对比；全部环境都找不到才报错。
-
-已知限制：部分环境里该表能读但返回 0 行，需要管理员身份才看得到数据。
-
----
-
-## d365_sync
+## d365_snapshot
 
 把环境元数据拉成本地快照。
 
@@ -222,6 +186,41 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 ---
 
+## d365_layers
+
+查 `msdyn_componentlayer`：组件被哪些解决方案覆盖过、层顺序、谁生效。
+
+`msdyn_componentlayer` 是虚拟实体（自定义数据提供程序）：**必须同时给组件 id 和组件类型**。只给名字、只给 id、什么都不给都会返回 0 行（不报错）。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `component` | string | 组件名或 GUID。Entity 用逻辑名；其它类型用该类记录的名称/唯一名；`OptionSet` 用全局选项集名称 |
+| `componentType` | enum | `Entity`、`Attribute`、`SystemForm`、`SavedQuery`、`Workflow`、`WebResource`、`PluginAssembly`、`PluginType`、`SdkMessageProcessingStep`、`CustomAPI`、`OptionSet` |
+| `entity` | string | `componentType=Attribute` 时必填 |
+| `solution` | string | 只看某个解决方案的层（服务端过滤，不会因为层数超过 `top` 而误报「没有层」） |
+| `includeJson` | boolean | 同时取 `msdyn_componentjson`（完整定义，可能很大，写文件） |
+| `top` | integer | 最多取多少条，默认 500 |
+| `environments` / `allEnvironments` | | 跨环境对比活动层 |
+
+```json
+{ "component": "account", "componentType": "Entity", "allEnvironments": true }
+{ "componentType": "Attribute", "component": "name", "entity": "account" }
+{ "componentType": "SystemForm", "component": "Account" }
+{ "componentType": "OptionSet", "component": "contoso_taxcategoryos", "allEnvironments": true }
+```
+
+返回按 `msdyn_order` 升序，最后一层是当前生效层；`（系统层）` 表示该层不来自任何解决方案。
+
+`Active` 是 Dataverse 给**未受管的自定义层**用的伪解决方案名：它存在时永远在最上面，盖住下面的受管层，也是唯一可以用 `d365_metadata_write plan-remove-layer` 删掉的一层。因此输出里会标成 `Active（未受管）`，并单独说明「最上层是未受管层」还是「该环境没有未受管层」——后者表示这个组件在这里完全跟着解决方案走。Active 层的 `msdyn_overwritetime` 恒为 `1900-01-01`（服务端不记录），更新时间显示为「不记录」而不是一个假的日期。
+
+`OptionSet` 只解析**全局**选项集（走 `GlobalOptionSetDefinitions(Name='…')` 取 `MetadataId`）；本地选项集随字段存在，用 `componentType=Attribute` + `entity` 查字段的层。选项集也可以删层（`d365_metadata_write plan-remove-layer`，`componentType: OptionSet`）。
+
+多环境查询时，某个环境没有该组件（按名称找不到）只会让**该环境**报「该环境没有这个组件」，其它环境照常返回并参与对比；全部环境都找不到才报错。
+
+已知限制：部分环境里该表能读但返回 0 行，需要管理员身份才看得到数据。
+
+---
+
 ## d365_refs
 
 反查引用：「我要改/删的这个东西，谁在用」。
@@ -249,6 +248,79 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 实现是服务端 `contains()` 过滤（`formxml` / `layoutxml` / `fetchxml`），不用把整个组织拉到本地。完整结果在 `.d365/query/`。
 
 限制：快速查看表单里引用其它实体字段的情况不在范围内；流程/业务规则是文本匹配，动态拼接的字段名可能漏判。
+
+---
+
+## d365_contract
+
+契约矩阵与漂移：把上游的插件注册与表单引用当成契约，检查下游是否还在履行。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `drift` \| `matrix` \| `waive` \| `waivers` | `drift` | |
+| `source` | string | 默认环境 | 上游 |
+| `targets` | string[] | 除上游外全部 | 下游 |
+| `optionSets` | string[] | — | 要逐值比对的全局选项集 |
+| `includeManaged` | boolean | false | 连受管程序集一起比（噪声大） |
+| `forms` | boolean | true | 检查表单引用的 Web 资源与站点地图 |
+| `handlers` | boolean | false | 下载脚本核对 Handler 函数是否存在（慢） |
+| `rule` / `env` / `object` / `reason` / `days` | | | `waive` 用：规则、环境、对象、理由、过期天数（默认 30） |
+
+```json
+{ "action": "drift", "source": "dev", "targets": ["sit", "uat"], "forms": false }
+```
+
+```json
+{ "action": "waive", "rule": "form-library-missing", "env": "sit",
+  "object": "/_static/_common/scripts/CommandbarActions.js", "reason": "该环境不用 SLA 对话框", "days": 30 }
+```
+
+规则表、豁免与趋势见 [checks.md](checks.md)。报告在 `.d365/reports/contract-*.md|json`。
+
+---
+
+## d365_migrate
+
+评估把某个解决方案发布到其它环境的迁移风险。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `assess` | `assess` | 目前只有评估 |
+| `source` | string | 默认环境 | 源环境 |
+| `solution` | string | 必填 | 解决方案唯一名 |
+| `targets` | string[] | 除源外全部 | 目标环境 |
+| `maxComponents` | integer | 150 | 最多评估多少组件 |
+| `full` | boolean | false | 评估全部组件（忽略 `maxComponents`） |
+| `concurrency` | integer | 4，上限 8 | 并发请求数 |
+
+```json
+{ "action": "assess", "source": "dev", "solution": "ContosoBase", "targets": ["sit"] }
+```
+
+结论分三类：数据风险（选项值丢失、标签漂移）、遮蔽（目标层最上层是谁、导入后压住哪些解决方案）、缺失与版本。
+
+报告：`.d365/reports/migration-<方案>-to-<目标>-<时间戳>.md` + `.json`。规则细节见 [checks.md](checks.md)。
+
+---
+
+## d365_code_check
+
+读一次 GitLab MR，检查改动在目标环境会不会跑不起来。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `mergeRequest` | string | 必填。MR 链接或 IID（`42` / `!42`） |
+| `project` | string | `group/project`；省略时用链接里的项目，再省略用设置页默认项目 |
+| `targets` | string[] | 要对照的环境；省略则全部 |
+
+```json
+{ "mergeRequest": "https://gitlab.example.com/contoso/powerapps/-/merge_requests/7759/diffs",
+  "targets": ["uat"] }
+```
+
+需要先在设置页「GitLab」填地址与只读令牌（`read_api`）；令牌所在用户至少 Reporter 角色。
+
+输出三段：阻断、警告、人工确认。报告在 `.d365/reports/code-check-<MR>-<时间戳>.md`。规则细节见 [checks.md](checks.md)。
 
 ---
 
@@ -379,7 +451,137 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 ---
 
-## d365_write
+## d365_roles
+
+查和改 Dataverse 安全角色。安全模型是「角色 → 权限 → 表 × 深度」三段，这个工具把三段都摊开：谁拥有某个角色（含通过团队继承的人）、某个用户有哪些角色、某个角色能对哪些表做什么、以及要改哪一条。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | 见下 | 必填 | 读：`roles` / `who-has-role` / `user-roles` / `role-privileges`；写入计划：`plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`；计划管理：`list` / `show` / `cancel` / `execute` |
+| `environment` | string | 默认环境 | |
+| `role` | string | — | 角色名或 `roleid`。同名角色在多个业务部门各有一份 |
+| `businessunit` | string | — | 业务部门名或 GUID：把同名角色钉到某一部门（如 `AP`） |
+| `user` | string | — | GUID、`user@contoso.com` 或姓名。查询时模糊匹配，写入要求唯一 |
+| `team` | string | — | 团队 GUID 或名称；给了 `team` 就按团队处理 |
+| `entity` | string | — | `role-privileges` 只看某张表，例如 `account` |
+| `privileges` | array | — | `plan-add-privileges` / `plan-remove-privileges` 要处理的权限：`"prvWriteAccount"` 或 `{"name":"prvWriteAccount","depth":"global"}` |
+| `name` / `filter` / `top` | | | `roles`：按名称包含匹配，或直接给 OData `$filter`；`top` 默认 200、最多 1000 |
+| `planId` | string | — | `show` / `cancel` / `execute` 的计划 id |
+| `rationale` | string | — | 为什么改，会写进计划和变更记录 |
+
+```json
+{ "action": "roles", "environment": "dev", "name": "Data Stewards" }
+{ "action": "who-has-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP" }
+{ "action": "user-roles", "environment": "dev", "user": "user@contoso.com" }
+{ "action": "role-privileges", "environment": "dev", "role": "Salesperson", "businessunit": "AP", "entity": "account" }
+{ "action": "plan-assign-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP", "user": "user@contoso.com", "rationale": "加入数据治理组" }
+```
+
+输出读法：
+
+- `who-has-role` 把「直接拥有」和「通过团队继承」分成两段。只数直接的人会漏掉团队带来的人；只数两者之并又会让「他为什么能看到」失去线索。
+- `role-privileges` 是一张「表 × 八种权限」的表，单元格是深度词：**本人**（只有自己拥有的记录）、**本部门**、**本部门及下级**、**组织**（整个环境）。空白表示没有这项权限。
+- 权限是位标志，不是 1..8 的序号：本组织实测 `prvReadAccount` = 1、`prvWriteAccount` = 2、`prvAppendAccount` = 4、`prvAppendToAccount` = 16、`prvCreateAccount` = 32、`prvDeleteAccount` = 65536、`prvShareAccount` = 262144、`prvAssignAccount` = 524288。工具翻译成词，不用背这些数。
+- 一个权限可能覆盖多张表（`prvReadAccount` 同时管 `account` 与 `customeraddress`），所以行数会多于「权限条数」——这是对的，不是重复。
+
+改名要注意的三件事：
+
+1. **同名角色按业务部门各存一份**。UAT 的 `Data Stewards` 有 16 份，权限各算各的。写入时必须能定位到唯一一条：加 `businessunit`，或直接用 `roleid`；否则报 `ambiguous-role` 并列出候选。
+2. **写入是两段式**。`plan-*` 只读、只出计划（落在 `.d365/pending-writes/`）；`execute` 前先校验「改安全角色」能力，再在对话里弹确认卡片，批准后才写，写完整条操作落到 `.d365/changes/`。
+3. **权限变更是高危**。一次误操作可以把数据开给不该看到的人，所以 `role.admin` 默认关闭，且不提供「按 filter 批量改」——必须给显式的角色/用户/团队与权限名。
+
+读取需要「读取业务数据」（`data.read`）；写入需要「改安全角色」（`role.admin`，默认关闭）。`role-privileges` 一次会读上千条权限，属正常：一个角色通常有 2000–18000 条权限记录。
+
+---
+
+## d365_invoke
+
+调一条 Dataverse 消息（action 或 function），返回 HTTP 状态与响应体——用来复现一次失败，或看某条消息到底返回什么。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `message` | string | — | 必填，消息名，例如 `WinOpportunity`、`contoso_DoSomething` |
+| `method` | `POST` \| `GET` | `POST` | `POST`=action（可带请求体）；`GET`=function（参数按 OData 别名拼进 URL，不能绑定记录） |
+| `entity` | string | — | 绑定 action 时必填：记录的实体集名（如 `accounts`） |
+| `id` | string | — | 绑定 action 时必填：记录主键 GUID |
+| `parameters` | object | — | `POST` 为请求体（action 的输入参数）；`GET` 为 function 的命名参数（值会按 OData 字面量格式化） |
+| `environment` | string | 默认环境 | |
+| `rationale` | string | — | 为什么要调这条消息，会写进产物与执行记录 |
+
+```json
+{ "message": "RetrieveTotalRecordCount", "method": "GET", "parameters": { "EntityNames": ["account"] } }
+{ "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
+```
+
+**权限按方法分**：`GET` function 是读，走「读取业务数据」（`data.read`）；`POST` action 需要「调用消息」（`message.invoke`，默认关闭）**和**「修改业务数据」（`data.write`）——消息由目标环境的插件实现，可能写数据。POST 每次都在对话里弹确认卡，写明环境、路径、请求体；**调用失败不抛异常**，而是把 HTTP 状态、错误码和响应体原样返回——那正是复现问题时最需要的部分。
+
+---
+
+## d365_flows
+
+查 Power Automate 云流。云流在 Dataverse 里就是 `workflow` 表 `category = 5` 的行，所以它和经典工作流同表、同权限、走同一套认证——**不需要 Power Automate 的 API 权限**。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `list` \| `show` \| `refs` | `list` | `list` 目录；`show` 一条流程的骨架；`refs` 哪些流程碰某张表 |
+| `name` | string | — | `show`：流程名称（精确匹配，先 `list` 拿到） |
+| `flowId` | string | — | `show`：`workflowid`（GUID），名称有重名或含特殊字符时用它 |
+| `entity` | string | — | `refs` 必填：表逻辑名（如 `account`、`contoso_determinationlogictable`） |
+| `filter` | string | — | `list`：附加 OData `$filter`，例如 `"statecode eq 1"` 只看已开启的 |
+| `top` | integer | 50 | `list` 返回行数（最多 500） |
+| `scanLimit` | integer | 1000 | `refs` 最多扫描多少条流程（最多 2000）；流程多时会逐页读 `clientdata` |
+| `environment` | string | 默认环境 | |
+
+```json
+{ "action": "list", "environment": "dev", "filter": "statecode eq 1", "top": 20 }
+{ "action": "show", "environment": "dev", "name": "Contoso Opportunity Research Flow" }
+{ "action": "refs", "environment": "dev", "entity": "account" }
+```
+
+`show` 输出：状态、托管、触发器（含「当记录创建或更新，范围：组织，过滤列：…，条件：…」这类细节）、动作数、涉及的表、连接器、连接引用，再给一张步骤表（只列前 40 个动作，其余见产物）。步骤路径用 ` > ` 表达嵌套，`（否则）`、`（caseName）` 标出分支。
+
+四件事值得知道：
+
+1. **`primaryentity` 全是 `none`**。云流不绑定单表，所以 `d365_metadata resource=workflows` 里看不出它碰哪张表；表名藏在 `clientdata` 的每个动作参数里（`entityName`），`refs` 就是把它们全解析出来反查。这一步没有服务端过滤可用，只能逐条读定义。
+2. **运行历史不在 Dataverse**。失败在第几次、卡在哪个动作、耗时多少，这些只在 Power Automate 服务侧（`api.flow.microsoft.com`，另一套 audience 与 `Flow.Read.All`）。这个工具只到「定义」层：谁定义了、怎么触发、碰哪些表、用哪些连接。
+3. **没纳入解决方案的云流也在**。它们落在默认解决方案里（`ismanaged = false`），`list` 能查到、`refs` 能扫到；要不要进解决方案是 ALM 的事，不是可见性问题。
+4. `refs` 的输出会写「扫描 N/M 条」——扫描是上限内全量，`scanLimit` 调小会明确告诉你只扫了一部分，不会把截断说成「没有」。
+
+---
+
+## d365_reports
+
+本机产物与占用。
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `action` | `list` \| `view` \| `cleanup` \| `compact` | `list` | |
+| `file` | string | — | `view` 的文件：`.d365` 下的相对路径（`query/xxx.json`）或文件名 |
+| `offset` | integer | 0 | `view` 从第几行开始（0 基） |
+| `match` | string | — | `view` 只显示包含该字符串的行（不区分大小写），在大 JSON 里找一条 GUID 用这个 |
+| `wrap` | integer | 400 | `view` 每行超过多少字符折行，0 表示不折行 |
+| `pretty` | boolean | `.json` 为 true | `view` 是否把 JSON 缩进展开 |
+| `target` | `snapshots` \| `reports` \| `diffs` \| `query` \| `changes` \| `all` | `all` | `cleanup` 的范围 |
+| `dryRun` | boolean | **true** | 只预演；确认后传 `false` 才删 |
+| `limit` | integer | 15 / 60 | `list` 每类列多少条；`view` 最多显示多少行（上限 2000） |
+
+```json
+{ "action": "cleanup", "target": "query" }
+{ "action": "cleanup", "target": "query", "dryRun": false }
+{ "action": "compact" }
+{ "action": "view", "file": "query/2026-11-09T04-03-33-467Z-data-count.json" }
+{ "action": "view", "file": "query/layers-uat.json", "match": "contoso_taxcategoryos", "offset": 40 }
+```
+
+`view` 只读 `.d365` 目录内的文件：绝对路径越界会被拒绝，而不是悄悄去读别的文件。大 JSON 默认缩进展开，配 `match` 找一条 GUID 比翻行号快。
+
+清理只碰 `.d365/` 下的已知子目录，删前逐个校验路径前缀；`waivers.json`、`pending-writes/`、配置文件永不被删。
+
+`reports` 按**一份报告**计数而不是按文件：每次分析写的是 `.json` + `.md` 一对，按文件算会让「保留 20 份」实际只留 10 份。
+
+---
+
+## d365_metadata_write
 
 元数据变更。**`plan-*` 只读**，生成计划；`execute` 在对话里弹确认卡片后才写入。
 
@@ -465,70 +667,48 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 ---
 
-## d365_migrate
+## d365_diagnose
 
-评估把某个解决方案发布到其它环境的迁移风险。
+运行时诊断，一个 `action` 下面三组：环境现在忙不忙（`health`）、失败的是哪些、为什么（`trace-*`）、时间花在哪（`perf-*`）。它们都读业务数据（`plugintracelogs`、`asyncoperation` 等），需要「读取业务数据」（`data.read`）。
 
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `action` | `assess` | `assess` | 目前只有评估 |
-| `source` | string | 默认环境 | 源环境 |
-| `solution` | string | 必填 | 解决方案唯一名 |
-| `targets` | string[] | 除源外全部 | 目标环境 |
-| `maxComponents` | integer | 150 | 最多评估多少组件 |
-| `full` | boolean | false | 评估全部组件（忽略 `maxComponents`） |
-| `concurrency` | integer | 4，上限 8 | 并发请求数 |
-
-```json
-{ "action": "assess", "source": "dev", "solution": "ContosoBase", "targets": ["sit"] }
-```
-
-结论分三类：数据风险（选项值丢失、标签漂移）、遮蔽（目标层最上层是谁、导入后压住哪些解决方案）、缺失与版本。
-
-报告：`.d365/reports/migration-<方案>-to-<目标>-<时间戳>.md` + `.json`。规则细节见 [checks.md](checks.md)。
-
----
-
-## d365_contract
-
-契约矩阵与漂移：把上游的插件注册与表单引用当成契约，检查下游是否还在履行。
+| `action` | 回答什么 |
+| --- | --- |
+| `health` | 现在动这个环境安全吗 |
+| `trace-list` | 窗口内有哪些跟踪 |
+| `trace-get` | 某一条跟踪里到底是什么 |
+| `trace-summary` | 哪些失败在重复，按签名归并 |
+| `trace-stages` | 一次调用内部时间花在哪一段 |
+| `perf-hotspots` | 时间都花在哪（按合计聚合） |
+| `perf-slowest` | 哪几次调用最慢 |
+| `perf-trend` | 按小时 / 天怎么变 |
 
 | 参数 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `action` | `drift` \| `matrix` \| `waive` \| `waivers` | `drift` | |
-| `source` | string | 默认环境 | 上游 |
-| `targets` | string[] | 除上游外全部 | 下游 |
-| `optionSets` | string[] | — | 要逐值比对的全局选项集 |
-| `includeManaged` | boolean | false | 连受管程序集一起比（噪声大） |
-| `forms` | boolean | true | 检查表单引用的 Web 资源与站点地图 |
-| `handlers` | boolean | false | 下载脚本核对 Handler 函数是否存在（慢） |
-| `rule` / `env` / `object` / `reason` / `days` | | | `waive` 用：规则、环境、对象、理由、过期天数（默认 30） |
+| `action` | 上述八个之一 | 必填 | |
+| `traceId` | string | — | `trace-get` / `trace-stages` 必填：`plugintracelogid`（通常来自 `trace-list`，或 `perf-slowest` 的 `trace` 列） |
+| `hours` | number | 24（`health`、`trace-*`）；72（`perf-*`） | 回看小时数；`trace-*` 最多 720，`perf-*` 最多 720 |
+| `entity` | string | — | `trace-*` / `perf-*`：只看某张表上的调用（`primaryentity`，如 `account`） |
+| `typename` | string | — | `trace-*` / `perf-*`：只看某个插件类型；支持 contains，例如 `ContactSearch` |
+| `message` | string | — | `trace-*` / `perf-*`：只看某个消息（`messagename`，如 `Create`） |
+| `exceptionOnly` | boolean | **true** | `trace-*`：默认只看抛了异常的跟踪；传 `false` 连成功执行一起看 |
+| `includeConfig` | boolean | false | `trace-get`：是否返回 `configuration` / `secureconfiguration` / `profile`（默认 false，这些字段可能含明文密钥） |
+| `top` | integer | 20 | `trace-list` 返回行数（最多 200）；`trace-summary` 分析的样本上限（默认 300，最多 500）；`perf-*` 返回行数 / 组（默认 20，最多 100） |
+| `minDuration` | number | — | `perf-*`：只看耗时不低于这个毫秒数的调用 |
+| `filter` | string | — | `perf-*`：附加 `$filter` |
+| `bucket` | `hour` \| `day` | `hour` | `perf-trend` 的桶大小 |
+| `environment` | string | 默认环境 | `trace-*` / `perf-*` |
+| `environments` | string[] | — | 任意 action：一次查多个环境 |
+| `allEnvironments` | boolean | false | 任意 action：全部环境 |
+
+`health` 用 `environments` / `allEnvironments` 选环境；单个 `environment` 是 `trace-*` / `perf-*` 的选择方式。
+
+### action=health
+
+环境健康：「现在动这个环境安全吗」。`hours`（默认 24）是失败作业的回看小时数。
 
 ```json
-{ "action": "drift", "source": "dev", "targets": ["sit", "uat"], "forms": false }
-```
-
-```json
-{ "action": "waive", "rule": "form-library-missing", "env": "sit",
-  "object": "/_static/_common/scripts/CommandbarActions.js", "reason": "该环境不用 SLA 对话框", "days": 30 }
-```
-
-规则表、豁免与趋势见 [checks.md](checks.md)。报告在 `.d365/reports/contract-*.md|json`。
-
----
-
-## d365_health
-
-环境健康：「现在动这个环境安全吗」。
-
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `environments` | string[] | 默认环境 | |
-| `allEnvironments` | boolean | false | |
-| `hours` | integer | 24 | 失败作业回看小时数 |
-
-```json
-{ "allEnvironments": true, "hours": 24 }
+{ "action": "health", "allEnvironments": true, "hours": 24 }
+{ "action": "health", "environments": ["sit"] }
 ```
 
 每环境给出：版本、组织名、排队中（Ready）、挂起作业数（Suspended）、近期失败数（按作业名合并）、正在导入/发布的解决方案、最近安装的解决方案、**插件跟踪级别**（组织 `plugintracelogsetting`：关闭 / 仅异常 / 全部）。
@@ -539,217 +719,36 @@ manifest 是区分「环境里没有」与「没采到」的唯一依据。全�
 
 读不到作业数据时不报 0：如果环境没勾「读取业务数据」，排队 / 挂起 / 失败三列显示 `—`，并在表下写明原因。以前这种情况会被吞成「0 个失败」，在排查时给出假的安全结论。
 
----
-
-## d365_reports
-
-本机产物与占用。
-
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `action` | `list` \| `view` \| `cleanup` \| `compact` | `list` | |
-| `file` | string | — | `view` 的文件：`.d365` 下的相对路径（`query/xxx.json`）或文件名 |
-| `offset` | integer | 0 | `view` 从第几行开始（0 基） |
-| `match` | string | — | `view` 只显示包含该字符串的行（不区分大小写），在大 JSON 里找一条 GUID 用这个 |
-| `wrap` | integer | 400 | `view` 每行超过多少字符折行，0 表示不折行 |
-| `pretty` | boolean | `.json` 为 true | `view` 是否把 JSON 缩进展开 |
-| `target` | `snapshots` \| `reports` \| `diffs` \| `query` \| `changes` \| `all` | `all` | `cleanup` 的范围 |
-| `dryRun` | boolean | **true** | 只预演；确认后传 `false` 才删 |
-| `limit` | integer | 15 / 60 | `list` 每类列多少条；`view` 最多显示多少行（上限 2000） |
-
-```json
-{ "action": "cleanup", "target": "query" }
-{ "action": "cleanup", "target": "query", "dryRun": false }
-{ "action": "compact" }
-{ "action": "view", "file": "query/2026-11-09T04-03-33-467Z-data-count.json" }
-{ "action": "view", "file": "query/layers-uat.json", "match": "contoso_taxcategoryos", "offset": 40 }
-```
-
-`view` 只读 `.d365` 目录内的文件：绝对路径越界会被拒绝，而不是悄悄去读别的文件。大 JSON 默认缩进展开，配 `match` 找一条 GUID 比翻行号快。
-
-清理只碰 `.d365/` 下的已知子目录，删前逐个校验路径前缀；`waivers.json`、`pending-writes/`、配置文件永不被删。
-
-`reports` 按**一份报告**计数而不是按文件：每次分析写的是 `.json` + `.md` 一对，按文件算会让「保留 20 份」实际只留 10 份。
-
----
-
-## d365_invoke
-
-调一条 Dataverse 消息（action 或 function），返回 HTTP 状态与响应体——用来复现一次失败，或看某条消息到底返回什么。
-
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `message` | string | — | 必填，消息名，例如 `WinOpportunity`、`contoso_DoSomething` |
-| `method` | `POST` \| `GET` | `POST` | `POST`=action（可带请求体）；`GET`=function（参数按 OData 别名拼进 URL，不能绑定记录） |
-| `entity` | string | — | 绑定 action 时必填：记录的实体集名（如 `accounts`） |
-| `id` | string | — | 绑定 action 时必填：记录主键 GUID |
-| `parameters` | object | — | `POST` 为请求体（action 的输入参数）；`GET` 为 function 的命名参数（值会按 OData 字面量格式化） |
-| `environment` | string | 默认环境 | |
-| `rationale` | string | — | 为什么要调这条消息，会写进产物与执行记录 |
-
-```json
-{ "message": "RetrieveTotalRecordCount", "method": "GET", "parameters": { "EntityNames": ["account"] } }
-{ "message": "WinOpportunity", "entity": "opportunities", "id": "<guid>", "parameters": { "Status": 3 } }
-```
-
-**权限按方法分**：`GET` function 是读，走「读取业务数据」（`data.read`）；`POST` action 需要「调用消息」（`message.invoke`，默认关闭）**和**「修改业务数据」（`data.write`）——消息由目标环境的插件实现，可能写数据。POST 每次都在对话里弹确认卡，写明环境、路径、请求体；**调用失败不抛异常**，而是把 HTTP 状态、错误码和响应体原样返回——那正是复现问题时最需要的部分。
-
----
-
-## d365_trace
+### action=trace-*
 
 读插件跟踪日志：谁跑了、跑了多久、为什么抛。
 
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `action` | `list` \| `get` \| `summary` \| `stages` | `list` | |
-| `traceId` | string | — | `get` / `stages` 必填：`plugintracelogid`（通常来自 `list` 输出） |
-| `hours` | number | 24 | 回看小时数 |
-| `entity` | string | — | 只看某张表上的跟踪（`primaryentity`，如 `account`） |
-| `typename` | string | — | 只看某个插件类型的跟踪；支持 contains，例如 `ContactSearch` |
-| `message` | string | — | 只看某个消息的跟踪（`messagename`，如 `Create`） |
-| `exceptionOnly` | boolean | **true** | 默认只看抛了异常的跟踪；传 `false` 连成功执行一起看 |
-| `includeConfig` | boolean | false | `get`：是否返回 `configuration` / `secureconfiguration` / `profile`（默认 false，这些字段可能含明文密钥） |
-| `top` | integer | 20 | `list` 返回行数（最多 200）；`summary` 分析的样本上限（默认 300，最多 500） |
-| `environment` / `environments` / `allEnvironments` | | 环境选择 |
-
 ```json
-{ "action": "summary", "environment": "sit", "hours": 168 }
-{ "action": "list", "entity": "contact", "message": "Create", "hours": 48 }
-{ "action": "get", "traceId": "44444444-4444-4444-4444-444444444444" }
-{ "action": "stages", "traceId": "44444444-4444-4444-4444-444444444444" }
+{ "action": "trace-summary", "environment": "sit", "hours": 168 }
+{ "action": "trace-list", "entity": "contact", "message": "Create", "hours": 48 }
+{ "action": "trace-get", "traceId": "44444444-4444-4444-4444-444444444444" }
+{ "action": "trace-stages", "traceId": "44444444-4444-4444-4444-444444444444" }
 ```
 
 四件事值得知道：
 
 1. **成功执行的 trace 存空串，不是 null**。只写 `exceptiondetails ne null` 会把成功执行也当失败列出来，所以「只看失败」实际是 `ne null` 且 `ne ''`。
-2. `summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
-3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），`list` / `get` / `summary` / `stages` 四个动作在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
-4. `stages` 只靠插件自己写进 messageblock 的时间戳（`Time Stamp:- 11/16/2026 06:10:25` 或 `06:10:25.123`），按时间戳间隔排序，给出「最大的一段」——所以它只能回答「时间花在哪一段」，回答不了「为什么这段慢」。插件没写两个以上时间戳时它会直说拆不出来，而不是给个空表。
+2. `trace-summary` 按「插件类型 + 消息 + 表 + 异常首行」归并签名，300 条失败通常只有几个签名；签名一样就是同一个 bug 在反复发生。
+3. 插件会把自己的凭据写进 messageblock（`secureConfig` 里的 `ClientSecret`），`trace-list` / `trace-get` / `trace-summary` / `trace-stages` 四个动作在输出和产物里都会屏蔽成 `***` 并告诉你屏蔽了几处。**跟踪日志按业务数据处理**，需要「读取业务数据」（`data.read`）。
+4. `trace-stages` 只靠插件自己写进 messageblock 的时间戳（`Time Stamp:- 11/16/2026 06:10:25` 或 `06:10:25.123`），按时间戳间隔排序，给出「最大的一段」——所以它只能回答「时间花在哪一段」，回答不了「为什么这段慢」。插件没写两个以上时间戳时它会直说拆不出来，而不是给个空表。
 
----
+### action=perf-*
 
-## d365_perf
-
-按插件执行耗时做聚合：时间花在哪些插件上（`hotspots`）、最慢的是哪几次（`slowest`）、每小时怎么变（`trend`）。数据同样来自 `plugintracelogs`，属于业务数据，需要「读取业务数据」（`data.read`）。
-
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `action` | `hotspots` \| `slowest` \| `trend` | — | 必填 |
-| `hours` | number | 72 | 回看小时数，最多 720 |
-| `entity` | string | — | 只看某张表（`primaryentity`） |
-| `typename` | string | — | 只看某个插件类型；支持 contains，例如 `ContactSearch` |
-| `message` | string | — | 只看某个消息（`Create` / `Update` …） |
-| `minDuration` | number | — | 只看耗时不低于这个毫秒数的调用 |
-| `filter` | string | — | 附加 `$filter` |
-| `top` | integer | 20 | 返回多少行 / 组，最多 100 |
-| `bucket` | `hour` \| `day` | `hour` | `trend` 的桶大小 |
-| `environment` / `environments` / `allEnvironments` | | 环境选择 |
+按插件执行耗时做聚合：时间花在哪些插件上（`perf-hotspots`）、最慢的是哪几次（`perf-slowest`）、每小时怎么变（`perf-trend`）。数据同样来自 `plugintracelogs`，属于业务数据，需要「读取业务数据」（`data.read`）。每行聚合结果都带次数、合计、p50、p95 与最慢。
 
 ```json
-{ "action": "hotspots", "environment": "dev", "hours": 168, "top": 10 }
-{ "action": "slowest", "environment": "dev", "entity": "account", "top": 5 }
-{ "action": "trend", "environment": "dev", "hours": 72, "bucket": "hour" }
+{ "action": "perf-hotspots", "environment": "dev", "hours": 168, "top": 10 }
+{ "action": "perf-slowest", "environment": "dev", "entity": "account", "top": 5 }
+{ "action": "perf-trend", "environment": "dev", "hours": 72, "bucket": "hour" }
 ```
 
 三件事值得知道：
 
-1. **`hotspots` 按「合计」排序，回答的是「时间都花在哪」，不是「哪一条最慢」**。一条 2 分钟但只跑 1 次的插件，和 78 次各 1.5 秒的插件，合计可以一样；想知道谁贡献了总量看 `hotspots`，想知道最差的一次看 `slowest`。
+1. **`perf-hotspots` 按「合计」排序，回答的是「时间都花在哪」，不是「哪一条最慢」**。一条 2 分钟但只跑 1 次的插件，和 78 次各 1.5 秒的插件，合计可以一样；想知道谁贡献了总量看 `perf-hotspots`，想知道最差的一次看 `perf-slowest`。
 2. 样本上限 5000 条，输出会写明窗口、样本量与**跟踪级别**。跟踪级别是「关闭」或「仅异常」时成功调用根本不写日志，这时的分布只代表有记录的那部分——它会直接这么告诉你，而不是给一个看起来完整的表。
-3. `slowest` 的 `trace` 列就是 `plugintracelogid`，拿它去 `d365_trace action=stages` 拆这一次调用内部的时间戳间隔。
-
----
-
-## d365_flows
-
-查 Power Automate 云流。云流在 Dataverse 里就是 `workflow` 表 `category = 5` 的行，所以它和经典工作流同表、同权限、走同一套认证——**不需要 Power Automate 的 API 权限**。
-
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `action` | `list` \| `show` \| `refs` | `list` | `list` 目录；`show` 一条流程的骨架；`refs` 哪些流程碰某张表 |
-| `name` | string | — | `show`：流程名称（精确匹配，先 `list` 拿到） |
-| `flowId` | string | — | `show`：`workflowid`（GUID），名称有重名或含特殊字符时用它 |
-| `entity` | string | — | `refs` 必填：表逻辑名（如 `account`、`contoso_determinationlogictable`） |
-| `filter` | string | — | `list`：附加 OData `$filter`，例如 `"statecode eq 1"` 只看已开启的 |
-| `top` | integer | 50 | `list` 返回行数（最多 500） |
-| `scanLimit` | integer | 1000 | `refs` 最多扫描多少条流程（最多 2000）；流程多时会逐页读 `clientdata` |
-| `environment` | string | 默认环境 | |
-
-```json
-{ "action": "list", "environment": "dev", "filter": "statecode eq 1", "top": 20 }
-{ "action": "show", "environment": "dev", "name": "Contoso Opportunity Research Flow" }
-{ "action": "refs", "environment": "dev", "entity": "account" }
-```
-
-`show` 输出：状态、托管、触发器（含「当记录创建或更新，范围：组织，过滤列：…，条件：…」这类细节）、动作数、涉及的表、连接器、连接引用，再给一张步骤表（只列前 40 个动作，其余见产物）。步骤路径用 ` > ` 表达嵌套，`（否则）`、`（caseName）` 标出分支。
-
-四件事值得知道：
-
-1. **`primaryentity` 全是 `none`**。云流不绑定单表，所以 `d365_metadata resource=workflows` 里看不出它碰哪张表；表名藏在 `clientdata` 的每个动作参数里（`entityName`），`refs` 就是把它们全解析出来反查。这一步没有服务端过滤可用，只能逐条读定义。
-2. **运行历史不在 Dataverse**。失败在第几次、卡在哪个动作、耗时多少，这些只在 Power Automate 服务侧（`api.flow.microsoft.com`，另一套 audience 与 `Flow.Read.All`）。这个工具只到「定义」层：谁定义了、怎么触发、碰哪些表、用哪些连接。
-3. **没纳入解决方案的云流也在**。它们落在默认解决方案里（`ismanaged = false`），`list` 能查到、`refs` 能扫到；要不要进解决方案是 ALM 的事，不是可见性问题。
-4. `refs` 的输出会写「扫描 N/M 条」——扫描是上限内全量，`scanLimit` 调小会明确告诉你只扫了一部分，不会把截断说成「没有」。
-
----
-
-## d365_access
-
-查和改 Dataverse 安全角色。安全模型是「角色 → 权限 → 表 × 深度」三段，这个工具把三段都摊开：谁拥有某个角色（含通过团队继承的人）、某个用户有哪些角色、某个角色能对哪些表做什么、以及要改哪一条。
-
-| 参数 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `action` | 见下 | 必填 | 读：`roles` / `who-has-role` / `user-roles` / `role-privileges`；写入计划：`plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`；计划管理：`list` / `show` / `cancel` / `execute` |
-| `environment` | string | 默认环境 | |
-| `role` | string | — | 角色名或 `roleid`。同名角色在多个业务部门各有一份 |
-| `businessunit` | string | — | 业务部门名或 GUID：把同名角色钉到某一部门（如 `AP`） |
-| `user` | string | — | GUID、`user@contoso.com` 或姓名。查询时模糊匹配，写入要求唯一 |
-| `team` | string | — | 团队 GUID 或名称；给了 `team` 就按团队处理 |
-| `entity` | string | — | `role-privileges` 只看某张表，例如 `account` |
-| `privileges` | array | — | `plan-add-privileges` / `plan-remove-privileges` 要处理的权限：`"prvWriteAccount"` 或 `{"name":"prvWriteAccount","depth":"global"}` |
-| `name` / `filter` / `top` | | | `roles`：按名称包含匹配，或直接给 OData `$filter`；`top` 默认 200、最多 1000 |
-| `planId` | string | — | `show` / `cancel` / `execute` 的计划 id |
-| `rationale` | string | — | 为什么改，会写进计划和变更记录 |
-
-```json
-{ "action": "roles", "environment": "dev", "name": "Data Stewards" }
-{ "action": "who-has-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP" }
-{ "action": "user-roles", "environment": "dev", "user": "user@contoso.com" }
-{ "action": "role-privileges", "environment": "dev", "role": "Salesperson", "businessunit": "AP", "entity": "account" }
-{ "action": "plan-assign-role", "environment": "dev", "role": "Data Stewards", "businessunit": "AP", "user": "user@contoso.com", "rationale": "加入数据治理组" }
-```
-
-输出读法：
-
-- `who-has-role` 把「直接拥有」和「通过团队继承」分成两段。只数直接的人会漏掉团队带来的人；只数两者之并又会让「他为什么能看到」失去线索。
-- `role-privileges` 是一张「表 × 八种权限」的表，单元格是深度词：**本人**（只有自己拥有的记录）、**本部门**、**本部门及下级**、**组织**（整个环境）。空白表示没有这项权限。
-- 权限是位标志，不是 1..8 的序号：本组织实测 `prvReadAccount` = 1、`prvWriteAccount` = 2、`prvAppendAccount` = 4、`prvAppendToAccount` = 16、`prvCreateAccount` = 32、`prvDeleteAccount` = 65536、`prvShareAccount` = 262144、`prvAssignAccount` = 524288。工具翻译成词，不用背这些数。
-- 一个权限可能覆盖多张表（`prvReadAccount` 同时管 `account` 与 `customeraddress`），所以行数会多于「权限条数」——这是对的，不是重复。
-
-改名要注意的三件事：
-
-1. **同名角色按业务部门各存一份**。UAT 的 `Data Stewards` 有 16 份，权限各算各的。写入时必须能定位到唯一一条：加 `businessunit`，或直接用 `roleid`；否则报 `ambiguous-role` 并列出候选。
-2. **写入是两段式**。`plan-*` 只读、只出计划（落在 `.d365/pending-writes/`）；`execute` 前先校验「改安全角色」能力，再在对话里弹确认卡片，批准后才写，写完整条操作落到 `.d365/changes/`。
-3. **权限变更是高危**。一次误操作可以把数据开给不该看到的人，所以 `role.admin` 默认关闭，且不提供「按 filter 批量改」——必须给显式的角色/用户/团队与权限名。
-
-读取需要「读取业务数据」（`data.read`）；写入需要「改安全角色」（`role.admin`，默认关闭）。`role-privileges` 一次会读上千条权限，属正常：一个角色通常有 2000–18000 条权限记录。
-
----
-
-## d365_code_check
-
-读一次 GitLab MR，检查改动在目标环境会不会跑不起来。
-
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `mergeRequest` | string | 必填。MR 链接或 IID（`42` / `!42`） |
-| `project` | string | `group/project`；省略时用链接里的项目，再省略用设置页默认项目 |
-| `targets` | string[] | 要对照的环境；省略则全部 |
-
-```json
-{ "mergeRequest": "https://gitlab.example.com/contoso/powerapps/-/merge_requests/7759/diffs",
-  "targets": ["uat"] }
-```
-
-需要先在设置页「GitLab」填地址与只读令牌（`read_api`）；令牌所在用户至少 Reporter 角色。
-
-输出三段：阻断、警告、人工确认。报告在 `.d365/reports/code-check-<MR>-<时间戳>.md`。规则细节见 [checks.md](checks.md)。
+3. `perf-slowest` 的 `trace` 列就是 `plugintracelogid`，拿它去 `d365_diagnose action=trace-stages` 拆这一次调用内部的时间戳间隔。

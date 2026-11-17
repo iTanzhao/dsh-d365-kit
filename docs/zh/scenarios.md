@@ -13,8 +13,8 @@
 ```
 
 ```
-d365_envs check=true
-d365_health allEnvironments=true hours=24
+d365_envs action=check
+d365_diagnose action=health allEnvironments=true hours=24
 d365_metadata resource=organization
 d365_metadata resource=solutions top=10 orderby="installedon desc"
 ```
@@ -43,7 +43,7 @@ d365_layers component=contoso_customertier componentType=Attribute entity=accoun
 - **数据**：该字段有值的记录分布（空值单独一档）；
 - **层**：这个字段是谁加的、当前生效层是哪个解决方案——如果来自受管解决方案，本地删不掉，只能让发布方改。
 
-删除本身是 `d365_write action=plan-delete-attribute ... acknowledge=true`，但通常先用这三份证据说服人。
+删除本身是 `d365_metadata_write action=plan-delete-attribute ... acknowledge=true`，但通常先用这三份证据说服人。
 
 ---
 
@@ -54,7 +54,7 @@ d365_layers component=contoso_customertier componentType=Attribute entity=accoun
 ```
 
 ```
-d365_sync   environments=["dev","sit"] resources=["forms","views","solutions"] includeAttributes=true entities=["account"]
+d365_snapshot   environments=["dev","sit"] resources=["forms","views","solutions"] includeAttributes=true entities=["account"]
 d365_diff   base=dev head=sit resources=["forms","views","attributes"]
 d365_layers component=Account componentType=SystemForm allEnvironments=true
 ```
@@ -116,7 +116,7 @@ contoso_taxcategoryos 还缺 36 个税号类型，按 .d365/reports 里的清单
 ```
 
 ```
-d365_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos \
+d365_metadata_write action=plan-add-options environment=dev optionSet=contoso_taxcategoryos \
   labels=["AD3|Andorra: Tax Register Number (NRT)", "..."]
 ```
 
@@ -163,10 +163,10 @@ d365_contract action=waive rule=form-library-missing env=sit \
 ```
 
 ```
-d365_health allEnvironments=true
+d365_diagnose action=health allEnvironments=true
 ```
 
-如果某个环境有正在进行的 `Publish` 或导入，任何写入都会 `0x80071151` 或等锁超时。等它结束再执行；`d365_write execute` 本身也会先查这一步，忙时直接拒绝而不是丢一个原始 429。
+如果某个环境有正在进行的 `Publish` 或导入，任何写入都会 `0x80071151` 或等锁超时。等它结束再执行；`d365_metadata_write execute` 本身也会先查这一步，忙时直接拒绝而不是丢一个原始 429。
 
 确认那条记录是残留（例如几天前中断的导入）时，才用 `force: true`。
 
@@ -196,7 +196,7 @@ d365_reports action=compact                         # 把快照 JSON 压成单�
 | 想问 | 组合 |
 | --- | --- |
 | 改这个字段安全吗 | `d365_refs` + `d365_data` + `d365_layers` |
-| 这个版本能发吗 | `d365_health` + `d365_migrate` + `d365_contract` |
+| 这个版本能发吗 | `d365_diagnose action=health` + `d365_migrate` + `d365_contract` |
 | 这个 MR 能合吗 | `d365_code_check` + `d365_refs` |
-| 环境之间差在哪 | `d365_sync` + `d365_diff` + `d365_layers` |
-| 为什么运行时报错 | `d365_refs`（字段/脚本引用）+ `d365_layers`（谁覆盖）+ `d365_health`（作业） |
+| 环境之间差在哪 | `d365_snapshot` + `d365_diff` + `d365_layers` |
+| 为什么运行时报错 | `d365_refs`（字段/脚本引用）+ `d365_layers`（谁覆盖）+ `d365_diagnose action=health`（作业） |

@@ -2,23 +2,55 @@
 
 **English** | [简体中文](CHANGELOG.zh-CN.md)
 
-Versioning: bug fixes bump the patch, new tools/capabilities bump the minor, changes to the config structure or renames bump the major.
+Versioning: bug fixes bump the patch, new tools/capabilities bump the minor. While the package is 0.x, a rename or a changed tool surface also bumps the minor, and the section starts with **Breaking**.
+
+## 0.37.0
+
+Eighteen tools instead of twenty-one, and every description now says what it is *not* for. This release renames and merges tool names, so check anything that hard-codes them (agent presets, saved prompts, your own notes).
+
+**Breaking: renames and merges**
+
+| 0.36.1 | 0.37.0 |
+| --- | --- |
+| `d365_write` | `d365_metadata_write` |
+| `d365_sync` | `d365_snapshot` |
+| `d365_access` | `d365_roles` |
+| `d365_configure` | `d365_envs` (`action: save` / `remove`; the old `check: true` boolean is `action: check`) |
+| `d365_trace` | `d365_diagnose` with `action: trace-list` / `trace-get` / `trace-summary` / `trace-stages` |
+| `d365_perf` | `d365_diagnose` with `action: perf-hotspots` / `perf-slowest` / `perf-trend` |
+| `d365_health` | `d365_diagnose` with `action: health` |
+
+There are no aliases: an old name is a "tool not found", not a nudge. The merges were chosen where the tools read the same rows — `d365_diagnose` is three views of `plugintracelog`, and the environment registry was split over two tools that wrote the same file.
+
+**Each description ends by naming its neighbour**
+- The last sentence of every tool description says where the *other* tool is better: "only metadata; for records use `d365_data_write` (one) or `d365_data_sync` (batch)", "compares local snapshots — take `d365_snapshot` first".
+- Action enums are spelled out on the `action` parameter itself, not only in the prose (nine `plan-*` actions were previously described as "plan-*").
+- Parameter descriptions are one clause each and carry the rule — range, enum, default, which action it applies to — instead of implementation notes. The descriptions that were in English are in Chinese like the rest.
+- What it costs: the whole descriptor (names, descriptions, parameter schemas, output schemas) went from 34.2k characters for 21 tools to 31.6k for 18 — 7.4% smaller, about 900 tokens less on every request that carries the tool list. Parameter text shrank 8.1%; description text is flat, because the routing sentences cost roughly what the removed duplicated sentences were worth.
+
+**Two skills instead of one**
+- `d365-troubleshooting` (existing) now uses the new names and actions, and covers `d365_code_check` and the `perf-*` ladder.
+- `d365-changes` (new) is the other half: read → plan → confirm → execute, which capabilities are off by default, which operations are irreversible, and why "no blockers" from `d365_migrate` / `d365_code_check` is not a green light.
+- Both ship with the package and are registered by the plugin; installing the bundle is enough.
+
+**Tests**
+- `npm test` runs `node --test test/` — 22 tests over the plan store (claim lock, single execution, ledger filtering), the shared rules (`recordKey`, `ownerLookup`, `keyedRows`, `compareVersion`, `writeTotals`), and the tool surface itself (18 unique names, every description and parameter described, permission sentences present, locale key parity, both skills load, no source file still names a removed tool).
 
 ## 0.36.1
 
 A review of the whole kit, read tool by tool. Three patterns repeat: a write could run without being the plan that was approved, a partial answer could look like a complete one, and a truncation could be read as a fact.
 
 **Writes**
-- **A plan executes once, and only if it is still the plan that was approved.** `d365_write` (and the settings page) now claim the plan with an exclusive lock file before the first call, re-read it from disk, and refuse unless it is still `pending`, still points at the same environment URL, and its operations still pass the capability check — derived from the operation types, not from the `capability` field the plan file carries. Cancelling a plan from the settings page while its card is open now does nothing on approval; before, the card ran the operations it still remembered.
+- **A plan executes once, and only if it is still the plan that was approved.** `d365_metadata_write` (and the settings page) now claim the plan with an exclusive lock file before the first call, re-read it from disk, and refuse unless it is still `pending`, still points at the same environment URL, and its operations still pass the capability check — derived from the operation types, not from the `capability` field the plan file carries. Cancelling a plan from the settings page while its card is open now does nothing on approval; before, the card ran the operations it still remembered.
 - **The ledger says what was about to happen, not only what happened.** The intent row is written before the first write and the same file is rewritten with the outcome, so a crash mid-plan leaves a `running` row instead of nothing.
-- **`d365_access` can execute at all.** It read the permission policy from the config object, so the lookup silently fell back to the defaults and "Security role" always read as *not granted*. A plan that partly failed is also kept now, instead of being deleted with its failures.
-- Security-role plans run only from their own card: the settings page refuses them (the card is where the role, the principal and the privileges are written out), and `d365_write` refuses to dispatch role operations.
+- **`d365_roles` can execute at all.** It read the permission policy from the config object, so the lookup silently fell back to the defaults and "Security role" always read as *not granted*. A plan that partly failed is also kept now, instead of being deleted with its failures.
+- Security-role plans run only from their own card: the settings page refuses them (the card is where the role, the principal and the privileges are written out), and `d365_metadata_write` refuses to dispatch role operations.
 - Approval cards sanitize operation summaries — a label containing newlines could otherwise add lines that looked like extra operations.
 - The settings-page write header is described for what it is: a cross-site guard. A local program running as the same user can send it, and the docs no longer claim it proves a person clicked; the plan file, the lock and the execution-time permission check are what constrain a write.
 
 **"Not checked" is no longer reported as "fine"**
 - `d365_diff`: a row is added/removed only when the other side was **complete** for that resource. Truncated snapshots, per-entity failures and unreadable files now produce `未确认` rows with the reason, and rows are matched on `name` plus the scope column (`objecttypecode` for forms, `returnedtypecode` for views, `primaryentity` elsewhere) — two forms with the same name used to collapse into one row.
-- `d365_sync`: an explicit `keep` is honored (the retention policy used to re-trim to `snapshotKeep`, silently discarding snapshots the call was asked to keep); attribute pages read `hasMore`, so a capped attribute list is marked; per-table resources are fetched per table instead of building `LogicalName='undefined'`; the manifest lists only files that were written.
+- `d365_snapshot`: an explicit `keep` is honored (the retention policy used to re-trim to `snapshotKeep`, silently discarding snapshots the call was asked to keep); attribute pages read `hasMore`, so a capped attribute list is marked; per-table resources are fetched per table instead of building `LogicalName='undefined'`; the manifest lists only files that were written.
 - `d365_migrate`: the verdict is `无法下结论` when any component could not be checked (unmapped layer type, missing name, failed probe), with a `未能核对的组件` section naming them. `d365_code_check`: a C# diff without a class declaration is no longer silently skipped, steps are matched with their message and table (the `$select` fallback used to drop both), attribute lookups that fail count as "unknown → confirm by hand" rather than "missing", assembly versions compare numerically, `+++i;` is no longer eaten as a diff header, `<formLibraries>` is read as a binding, and a diff that could not be downloaded is listed as unverified rather than as "no metadata problems".
 - Contract drift compares steps per message, stage, mode **and table**; a missing table is no longer satisfied by any table's step.
 
@@ -38,7 +70,7 @@ A review of the whole kit, read tool by tool. Three patterns repeat: a write cou
 - `d365_invoke` validates the message, entity set, record id and GET parameter names; a POST now needs `message.invoke` **and** `data.write` (a `message.invoke` grant used to replace the data-write floor for any POST).
 - Settings page: errors show the hint that came with them, a failed poll backs off instead of stopping, only `pending` plans offer Execute, deletions and layer removals are marked unrecoverable, timestamps are formatted, every environment key is validated before saving, and Discard cannot be clicked twice.
 
-Behavior changes worth noting: `d365_data id` no longer accepts a bare quoted alternate key (`'contoso_001'`); `d365_sync keep` overrides the retention count; `d365_diff` rows can now be `未确认`; security-role plans execute only from the chat card.
+Behavior changes worth noting: `d365_data id` no longer accepts a bare quoted alternate key (`'contoso_001'`); `d365_snapshot keep` overrides the retention count; `d365_diff` rows can now be `未确认`; security-role plans execute only from the chat card.
 
 ## 0.36.0
 
@@ -64,7 +96,7 @@ The parts of the same write-up that map straight onto code: one failing environm
 
 ## 0.35.0
 
-New `d365_access`: the whole "role → privilege → table × depth" chain, readable and changeable. Tool count 19 → 20.
+New `d365_roles`: the whole "role → privilege → table × depth" chain, readable and changeable. Tool count 19 → 20.
 
 - Four reads: `roles` (grouped by name — the same role exists once per business unit), `who-has-role` (direct holders and people who inherit it through a team, listed separately), `user-roles` (a user's direct and inherited roles), `role-privileges` (tables × eight rights, each cell a depth word: User / Business unit / Business unit and below / Organization).
 - Four write plans: `plan-assign-role` / `plan-remove-role` / `plan-add-privileges` / `plan-remove-privileges`. Writes stay two-phase: the plan lands in `.d365/pending-writes/`, `execute` checks the capability, asks on a confirmation card, and records the result in `.d365/changes/`.
@@ -121,7 +153,7 @@ A cloud flow is a `workflow` row with `category = 5` in Dataverse — same table
 
 Documentation: a "which tool for which question" table at the top of the tool reference and of the troubleshooting skill.
 
-- **`docs/en/tools.md` / `docs/zh/tools.md` open with a routing table** — sixteen questions, the tool that answers each, and the one people reach for by mistake (change a field on many records → `d365_data_sync plan-update`, not `d365_data_write`; "why is this column not on the form" → `d365_refs` + `d365_layers`, not `attributes`; "what differs between two environments" → `d365_sync` + `d365_diff`, not two queries by eye);
+- **`docs/en/tools.md` / `docs/zh/tools.md` open with a routing table** — sixteen questions, the tool that answers each, and the one people reach for by mistake (change a field on many records → `d365_data_sync plan-update`, not `d365_data_write`; "why is this column not on the form" → `d365_refs` + `d365_layers`, not `attributes`; "what differs between two environments" → `d365_snapshot` + `d365_diff`, not two queries by eye);
 - **The troubleshooting skill carries the same table**, so the routing is loaded with the skill rather than looked up;
 - The read/write convention now also lists `d365_invoke` (POST) as a call that changes the environment and needs approval.
 
@@ -151,7 +183,7 @@ A self-audit of every module (47 under `lib/`, `index.js` and the 1.7k-line `cli
 - **`d365_data` interpolated the entity name into `$filter` unescaped** (with `odataString` imported but unused): a quote in the name got a 400 that was reported as "no such entity", and a crafted name could widen the filter. It now rejects anything outside a logical-name shape;
 - **`d365_health` reported `0 failures` when it was not allowed to look.** Every job query was `catch(() => null)` then `?? 0`, so a missing `data.read`/403 read as a clean bill of health — on the tool you run when something is wrong. The columns now show `—` with a line saying why;
 - **`d365_trace` masked credentials only in `get`**: `list` and `summary` wrote the raw `exceptiondetails` into the artifact and the transcript. All three actions mask now;
-- **`d365_sync` offered per-entity resources with no entity parameter** (`attributes`, `keys`, `*_relationships`) and built `LogicalName='undefined'`; they are skipped with a note under issues. `d365_contract` now counts expired waivers, and `handler-missing` findings are de-duplicated per environment instead of only being reported for the first one;
+- **`d365_snapshot` offered per-entity resources with no entity parameter** (`attributes`, `keys`, `*_relationships`) and built `LogicalName='undefined'`; they are skipped with a note under issues. `d365_contract` now counts expired waivers, and `handler-missing` findings are de-duplicated per environment instead of only being reported for the first one;
 - Settings/config JSON is written through a temp file whose name now carries a random suffix: two concurrent saves in one process shared `${path}.tmp-${pid}` and could rename each other's half-written bytes into place.
 
 ## 0.32.1
@@ -215,7 +247,7 @@ Migrations bind lookups by their real navigation property name, and the settings
 
 Removing an unmanaged layer now works for every component type, not just tables and columns.
 
-- `d365_write plan-remove-layer` accepts all eleven `componentType` values (`Entity`, `Attribute`, `OptionSet`, `SavedQuery`, `Workflow`, `SystemForm`, `WebResource`, `PluginType`, `PluginAssembly`, `SdkMessageProcessingStep`, `CustomAPI`); the numeric `ComponentType` each one sends to `RemoveActiveCustomizations` comes from the `solutioncomponent.componenttype` picklist read from the live service, not from guesswork (CustomAPI carries its table's object type code, 10519);
+- `d365_metadata_write plan-remove-layer` accepts all eleven `componentType` values (`Entity`, `Attribute`, `OptionSet`, `SavedQuery`, `Workflow`, `SystemForm`, `WebResource`, `PluginType`, `PluginAssembly`, `SdkMessageProcessingStep`, `CustomAPI`); the numeric `ComponentType` each one sends to `RemoveActiveCustomizations` comes from the `solutioncomponent.componenttype` picklist read from the live service, not from guesswork (CustomAPI carries its table's object type code, 10519);
 - The plan now renders the whole layer stack before the operation and names what takes over after removal, so the destructive step is reviewable without opening the JSON;
 - Publish scope after removal follows the component: a table or column publishes that table, a form or view publishes its owning table, an option set publishes that option set, and everything else publishes the whole environment — an unknown or unowned component falls back to a full publish rather than a wrong narrowed one;
 - Fixed: a form that belongs to no table made Dataverse answer `objecttypecode` with the literal `none`, which the publish step would have passed on as a table name; it now reads as "no narrowed scope".
@@ -235,7 +267,7 @@ Global option sets got their layers, the layer output says what `Active` means, 
 
 Solution layers are now writable, in exactly one way: remove the unmanaged layer.
 
-- New `d365_write` action `plan-remove-layer` and capability `layer.remove` ("Remove custom layer", high risk, off by default): it deletes the top-most layer of a table or a column **only when that layer reads `Active`** — the unnamed unmanaged layer — so whatever a solution last shipped becomes active again;
+- New `d365_metadata_write` action `plan-remove-layer` and capability `layer.remove` ("Remove custom layer", high risk, off by default): it deletes the top-most layer of a table or a column **only when that layer reads `Active`** — the unnamed unmanaged layer — so whatever a solution last shipped becomes active again;
 - The plan renders the whole layer stack, the layer being removed and the layer that takes over (or "system definition" when nothing is below); execution goes through the same confirmation card and the same publish step, narrowed to the affected table;
 - `RemoveActiveCustomizations` is the only message behind it. A top layer owned by a solution is refused up front (`not-active-layer`): those definitions belong to that solution — remove the component there, or ship a patch that overrides it;
 - `DeleteAndPromote` and `RemoveSolutionComponent` are deliberately not implemented;
@@ -394,7 +426,7 @@ Contract matrix and drift engine `d365_contract`: assemblies, plugin types, step
 
 - metadata queries (19 resource kinds), multi-environment alignment;
 - solution layers `d365_layers` (virtual entity, must have component id + type);
-- snapshots `d365_sync` and diffing `d365_diff` (manifest records completeness, noise filtering);
+- snapshots `d365_snapshot` and diffing `d365_diff` (manifest records completeness, noise filtering);
 - environment configuration and the settings page;
 - write capabilities: add/update/delete option set values, add/update/delete fields, entity display names, system view columns; plan → human confirmation → execution → audit;
 - fixed a batch of real-environment differences: missing `organization` columns, the metadata endpoint not supporting `$top`/`$orderby`, the token cache not being invalidated after switching user, and the layer table requiring a type.

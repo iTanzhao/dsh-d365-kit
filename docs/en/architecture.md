@@ -7,7 +7,7 @@
 One DSH bundle in two parts:
 
 ```
-index.js      # Host side: registers the 21 tools, mounts the settings page HTTP routes
+index.js      # Host side: registers the 18 tools, mounts the settings page HTTP routes
 client.js     # Web side: settings page (six tabs, no build step, a browser module directly)
 lib/*.js      # All Host-side logic (51 modules)
 ```
@@ -17,6 +17,11 @@ Zero runtime dependencies: only Node's built-in `fetch` / `fs` / `path`. No Type
 `cordis.patch.yml` declares the bundle and its default config (`configFile`, `timeoutMs`, `snapshotKeep`, `environments`);
 `package.json`'s `dsh.bundle.patch` points at it, and `dsh.client` declares the Web-side entry.
 
+`index.js` exports `name` and `inject`. It does **not** export a `Config` schema: DSH expects a Cordis Schema instance there, and this
+package deliberately declares no dependencies, so the row config is validated where it is read instead — `normalizeConfig` in
+`lib/config.js` checks the URL, timeouts and limits, keeps an invalid environment visible instead of dropping it, and returns the problems
+as `issues`. `test/rules.test.js` covers the rules that used to be silent.
+
 ## Module responsibilities
 
 ```
@@ -24,7 +29,7 @@ lib/
   client.js           Dataverse Web API client: URL building, paging, retries, permission gate, tokens
   auth.js             Entra ID client-credentials flow; tokens cached per credential fingerprint
   config.js           Config load/normalize; configFile fallback chain; secret resolution
-  resources.js        Query definitions and field mappings for 19 metadata resource types
+  resources.js        Query definitions and field mappings for the 20 metadata resource types
   runtime.js          makeClient(env, config), org info, version
   snapshot.js         Snapshot writing, manifest, snapshot directory
   retention.js        Retention policy, disk stats, cleanup, compaction
@@ -39,12 +44,14 @@ lib/
   code-check.js       MR check (JS/TS)
   csharp-check.js     MR check (C#)
   refs.js             Reverse index (forms/views/flows/steps)
-  health.js           Environment health
+  health.js           Environment health (behind `d365_diagnose action=health`)
   gitlab.js           GitLab API (MR diff, connectivity)
   waivers.js          Contract waivers
   contract-history.js Drift trend
   data-migrate.js     Business-record migration (plan, lookup resolution, writes, run log)
-  tool-*.js           21 tools, one file per tool (or per related group)
+  tool-environments.js d365_envs: list / check / save / remove (`tool-configure.js` is gone; save and remove live here)
+  tool-ops.js         d365_diagnose: health / trace-* / perf-* — the work stays in `tool-health.js`, `tool-trace.js`, `tool-perf.js` (and `health.js`)
+  tool-*.js           the other 16 tools, one file per tool (or per related group)
 ```
 
 ## Data flow
@@ -60,7 +67,7 @@ agent calls d365_*  ──> tool-*.js ──> lib capability modules ──> cli
 Design principles:
 
 1. **Tools return a summary and a path; the body lands in a file** — do not stuff tens of MB of JSON into the conversation;
-2. **Read-only first** — only `d365_write execute` and `d365_data_write` change an environment, and both require human approval;
+2. **Read-only first** — only `d365_metadata_write execute` and `d365_data_write` change an environment, and both require human approval;
 3. **Decisions live in one place** — what can be seen and what can be changed are both decided at the request entry point in `lib/client.js`, so new tools cannot bypass them;
 4. **Live beats snapshot** — "how is it now" questions such as drift, migration, and health read live data; snapshots are only for comparison across time or environments;
 5. **Rules are data** — contract rules, retention policy, and the capability table are all table-driven; adding a rule does not change the flow.
@@ -155,10 +162,10 @@ Note: `new Response('', { status: 204 })` throws `Invalid response status code 2
 Minimal set for verifying against a real environment:
 
 ```
-d365_envs check=true
+d365_envs action=check
 d365_metadata resource=entities top=2
 d365_layers component=account componentType=Entity
-d365_health environments=["<env>"]
+d365_diagnose action=health environments=["<env>"]
 ```
 
 ## Known pitfalls (for the next person to change the code)
