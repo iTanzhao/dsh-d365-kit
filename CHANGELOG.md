@@ -4,6 +4,33 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor. While the package is 0.x, a rename or a changed tool surface also bumps the minor, and the section starts with **Breaking**.
 
+## 0.37.1
+
+A correctness pass over 0.37.0's own surface: one of its changes would have made four tools fail outright, and its "no stale tool name" test was looking in the wrong place.
+
+**A rejected query option no longer kills `$top`-intolerant endpoints**
+- 0.37.0 stopped dropping `$orderby` / `$select` when Dataverse answers "the query parameter is not supported" — right, because dropping them answers a different question. But it also stopped dropping `$top`, and `EntityDefinitions` / `RelationshipDefinitions` / `GlobalOptionSetDefinitions` reject `$top` unconditionally. `d365_data`, `d365_data_sync`, `d365_code_check` and `d365_snapshot` (whose default resource is `entities`) would have failed on contact.
+- Now one retry drops only `$top` — the page size, which cannot change which rows exist — and reports it; a second rejection still surfaces as `unsupported-query-option` with the remaining options named. The four definition reads also ask without `$top` up front, so the retry is not spent on every call.
+
+**Multi-environment reports keep environment order**
+- Dropping the sequential loop for `mapEnvironments` made five tools append sections in completion order (`d365_data`, `d365_flows`, `d365_refs`, `d365_diagnose` trace actions, `d365_diagnose` perf actions). The summary could list `sit` above `dev` simply because `sit` answered faster.
+- Each worker now writes its own slot; the report is in the order you asked for. `d365_layers`, `d365_metadata` and `d365_snapshot` already returned values instead of appending.
+
+**`d365_diagnose` stopped naming deleted tools**
+- Its empty-window hints still said "look at the `插件跟踪` column of `d365_health`" and "use `d365_trace action=stages`" — both tools no longer exist. They now point at `action=health` and `action=trace-stages`, i.e. the same tool the message comes from.
+
+**Tests that can see the problem**
+- The removed-tool-name test walked only the repository root (`readdir`, non-recursive), so `lib/` was never checked — which is how the stale hint above shipped. It now walks `lib/`, `skills/`, `docs/`, `locale/` and `test/`, strips comments (migration notes are allowed to say `(was d365_health)`), and skips the changelogs.
+- The skill test checked only each skill's `description`; it now checks the body, where the tool names actually are.
+- The query-option test expected a single attempt; it now asserts the retry drops `$top` and keeps `$filter` / `$orderby` / `$select`.
+
+**Locale files stop drifting**
+- `locale/en.json` and `locale/zh.json` still listed `d365_configure` and `d365_health` and were missing five shipped tools. They now carry exactly the 18 registered names. (Nothing imports these files; they ship as data.)
+
+**Smaller**
+- `d365_data` `count` / `group` do not write an artifact when the answer is short, so the docs no longer promise a file path for every result.
+- `d365_code_check` reads `EntityDefinitions` without `$top`; it used to swallow the rejection and report "could not read the table list".
+
 ## 0.37.0
 
 Eighteen tools instead of twenty-one, and every description now says what it is *not* for. This release renames and merges tool names, so check anything that hard-codes them (agent presets, saved prompts, your own notes).

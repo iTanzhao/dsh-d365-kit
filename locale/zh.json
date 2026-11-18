@@ -24,14 +24,6 @@
       "title": "快照对比",
       "description": "比较两份快照的新增、删除与字段级修改"
     },
-    "d365_configure": {
-      "title": "环境配置",
-      "description": "读写环境清单：列出、保存、删除或测试连接"
-    },
-    "d365_metadata_write": {
-      "title": "元数据变更",
-      "description": "准备选项值、字段、表名与视图列的修改计划，确认后执行"
-    },
     "d365_migrate": {
       "title": "迁移评估",
       "description": "评估解决方案导入其它环境的风险：遮蔽、缺失、选项值丢失"
@@ -52,17 +44,37 @@
       "title": "业务数据写入",
       "description": "新建或修改一条业务记录，确认后执行（需环境授权）"
     },
+    "d365_data_sync": {
+      "title": "业务记录同步",
+      "description": "在环境间复制记录，或批量修改已有记录（计划、确认、执行）"
+    },
     "d365_contract": {
       "title": "契约漂移",
       "description": "核对插件注册、表单脚本与站点地图在上游下游是否一致，支持豁免"
     },
-    "d365_health": {
-      "title": "环境健康",
-      "description": "挂起与失败的后台作业、正在运行的导入发布、最近安装的解决方案"
+    "d365_diagnose": {
+      "title": "运行诊断",
+      "description": "环境健康、插件跟踪与耗时分布：health、trace-*、perf-*"
     },
     "d365_reports": {
       "title": "本机数据",
       "description": "查看本机产物占用，按保留策略清理或压缩快照"
+    },
+    "d365_flows": {
+      "title": "云流",
+      "description": "Dataverse 里的 Power Automate 云流：清单、单条骨架、谁会碰这张表"
+    },
+    "d365_invoke": {
+      "title": "调用消息",
+      "description": "调一条 Dataverse 动作或函数，返回状态码与响应体"
+    },
+    "d365_roles": {
+      "title": "安全角色",
+      "description": "谁拥有某个角色、角色能改什么，以及修改它们的计划（需「改安全角色」）"
+    },
+    "d365_metadata_write": {
+      "title": "元数据变更",
+      "description": "准备选项值、字段、表名与视图列的修改计划，确认后执行"
     }
   }
 }

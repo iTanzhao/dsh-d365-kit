@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { getPagedWithSelectFallback } from '../lib/client.js'
+import { D365Error } from '../lib/errors.js'
 import { compareVersion } from '../lib/contract.js'
 import { ownerLookup } from '../lib/data-migrate.js'
 import { keyedRows } from '../lib/resources.js'
 import { recordKey } from '../lib/tool-data.js'
 import { writeTotals } from '../lib/tool-data-sync.js'
+import { artifactRoot, mapEnvironments, writeArtifact } from '../lib/runtime.js'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 test('recordKey accepts a GUID', () => {
   const id = '11111111-2222-3333-4444-555555555555'
@@ -74,4 +80,87 @@ test('writeTotals never reports a negative write count', () => {
     overwritten: 2,
     total: 5,
   })
+})
+
+test('select fallback retries only with the rejected selected column removed', async () => {
+  const requests = []
+  const client = {
+    async getPaged(path, params) {
+      requests.push({ path, params: { ...params } })
+      if (params.$select.includes('badcolumn')) {
+        throw new D365Error("Could not find a property named 'badcolumn' on type 'X'", { status: 400 })
+      }
+      return { records: [{ name: 'ok' }], hasMore: false }
+    },
+  }
+  const result = await getPagedWithSelectFallback(client, 'accounts', {
+    $select: 'name,badcolumn',
+    $filter: "name eq 'A'",
+    $orderby: 'name',
+  }, 5)
+  assert.deepEqual(result.page.records, [{ name: 'ok' }])
+  assert.equal(result.selectDropped, true)
+  assert.deepEqual(result.droppedFields, ['badcolumn'])
+  assert.equal(requests.length, 2)
+  assert.equal(requests[1].params.$select, 'name')
+  assert.equal(requests[1].params.$filter, "name eq 'A'")
+  assert.equal(requests[1].params.$orderby, 'name')
+})
+
+test('select fallback never removes a missing property used outside select', async () => {
+  const client = {
+    async getPaged() {
+      throw new D365Error("Could not find a property named 'missing' on type 'X'", { status: 400 })
+    },
+  }
+  await assert.rejects(
+    getPagedWithSelectFallback(client, 'accounts', { $select: 'name,missing', $filter: 'missing eq 1' }, 5),
+    (error) => error.code === 'unknown-property',
+  )
+})
+
+test('mapEnvironments bounds concurrency and preserves input order', async () => {
+  let active = 0
+  let peak = 0
+  const items = [10, 20, 30, 40, 50]
+  const results = await mapEnvironments(items, async (item, index) => {
+    active += 1
+    peak = Math.max(peak, active)
+    await new Promise((resolve) => setTimeout(resolve, (items.length - index) * 2))
+    active -= 1
+    return item * 2
+  }, 2)
+  assert.equal(peak, 2)
+  assert.deepEqual(results, [20, 40, 60, 80, 100])
+})
+
+test('writeArtifact stores compact JSON with one trailing newline', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'd365-kit-'))
+  try {
+    const config = { workspaceDir: directory }
+    const file = await writeArtifact(config, 'compact', { ok: true, rows: [{ id: 1 }] })
+    const text = await readFile(file, 'utf8')
+    assert.equal(text, '{"ok":true,"rows":[{"id":1}]}\n')
+    assert.ok(file.startsWith(artifactRoot(config).replace(/\\/g, '/')))
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('a rejected query option is retried once without $top, then surfaced', async () => {
+  const seen = []
+  const client = {
+    async getPaged(_path, params) {
+      seen.push(params)
+      throw new D365Error("The query parameter '$orderby' is not supported", { status: 400 })
+    },
+  }
+  await assert.rejects(
+    getPagedWithSelectFallback(client, 'accounts', { $select: 'name', $orderby: 'name' }, 5),
+    (error) => error.code === 'unsupported-query-option',
+  )
+  // Metadata endpoints reject `$top`, so one retry drops only the page size.
+  // `$orderby`/`$select` must survive it: dropping them answers another question.
+  assert.equal(seen.length, 2)
+  assert.deepEqual(seen[1], { $select: 'name', $orderby: 'name', __noTop: true })
 })

@@ -24,14 +24,6 @@
       "title": "Diff snapshots",
       "description": "Compare two snapshots: additions, deletions and field-level edits"
     },
-    "d365_configure": {
-      "title": "Configure environments",
-      "description": "List, save, remove or test environment definitions"
-    },
-    "d365_metadata_write": {
-      "title": "Metadata changes",
-      "description": "Plan option values, attributes, table names and view columns, then apply after approval"
-    },
     "d365_migrate": {
       "title": "Migration risk",
       "description": "Assess importing a solution elsewhere: shadowing, missing components, lost option values"
@@ -52,17 +44,37 @@
       "title": "Write data",
       "description": "Create or update one business record after approval (requires environment permission)"
     },
+    "d365_data_sync": {
+      "title": "Business record sync",
+      "description": "Copy records between environments, or update a batch of existing ones (plan, confirm, execute)"
+    },
     "d365_contract": {
       "title": "Contract drift",
       "description": "Check plugin registrations, form scripts and sitemaps across environments, with waivers"
     },
-    "d365_health": {
-      "title": "Environment health",
-      "description": "Suspended and failed jobs, running imports and publishes, recently installed solutions"
+    "d365_diagnose": {
+      "title": "Diagnose",
+      "description": "Environment health, plug-in traces and where execution time goes: health, trace-*, perf-*"
     },
     "d365_reports": {
       "title": "Local data",
       "description": "Inspect local artifact usage, clean up by retention policy or compact snapshots"
+    },
+    "d365_flows": {
+      "title": "Cloud flows",
+      "description": "Power Automate cloud flows from Dataverse: the list, one flow's skeleton, who touches a table"
+    },
+    "d365_invoke": {
+      "title": "Invoke message",
+      "description": "Call one Dataverse action or function and see the status and response body"
+    },
+    "d365_roles": {
+      "title": "Security roles",
+      "description": "Who holds a role, what it may do, and the plans that change both (needs \"Change security roles\")"
+    },
+    "d365_metadata_write": {
+      "title": "Metadata changes",
+      "description": "Plan option values, attributes, table names and view columns, then apply after approval"
     }
   }
 }

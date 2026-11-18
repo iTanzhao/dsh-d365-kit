@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../zh/tools.md)
 
-18 tools, all prefixed with `d365_`. Every result is "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location.
+18 tools, all prefixed with `d365_`. Results are "summary + file path": when the body is too long it goes to a file, and the conversation only gets the conclusion and the location. A few short answers skip the file — `d365_data count` / `group`, and lists small enough to fit in the conversation — so there is no artifact to open for those.
 
 Conventions:
 

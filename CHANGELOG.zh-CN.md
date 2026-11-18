@@ -4,6 +4,33 @@
 
 版本语义：修 bug 升 patch，加工具/加能力升 minor。0.x 期间改名或改动工具面也升 minor，并在小节开头写 **Breaking**。
 
+## 0.37.1
+
+针对 0.37.0 自己这一版工具面的修正：其中一处改动会让四个工具直接失败，而它那条「没有残留旧工具名」的测试查错了地方。
+
+**被拒的查询参数不再连累不能带 `$top` 的端点**
+- 0.37.0 不再在「查询参数不被支持」时依次丢掉 `$orderby` / `$select`——这是对的，丢掉它们等于换一个问题。但它也把 `$top` 的降级一起删了，而 `EntityDefinitions` / `RelationshipDefinitions` / `GlobalOptionSetDefinitions` 一律拒绝 `$top`。`d365_data`、`d365_data_sync`、`d365_code_check` 与 `d365_snapshot`（默认资源就是 `entities`）会一调用就失败。
+- 现在只重试一次、只去掉 `$top`（页大小，改不了有哪些行），并在结果里说明；仍然被拒才抛 `unsupported-query-option` 并点名剩下的可选项。四个定义读取也改成一开始就不带 `$top`，不用每次白付一次重试。
+
+**多环境报告按环境顺序输出**
+- 用 `mapEnvironments` 取代串行循环后，五个工具变成按完成顺序追加段落（`d365_data`、`d365_flows`、`d365_refs`、`d365_diagnose` 的 trace 动作与 perf 动作）。谁先答完谁排前面，`sit` 可能排在 `dev` 上面。
+- 现在每个 worker 写自己的槽位，报告顺序与请求顺序一致。`d365_layers`、`d365_metadata`、`d365_snapshot` 本来就是返回值渲染，天然保序。
+
+**`d365_diagnose` 不再指向已删除的工具**
+- 空窗口提示还写着「先看 `d365_health` 的『插件跟踪』列」「用 `d365_trace action=stages`」——这两个工具都已不存在。现在改为 `action=health` 与 `action=trace-stages`，也就是这条消息自己所在的工具。
+
+**测试能看见问题了**
+- 「没有源码残留旧工具名」只 `readdir` 了仓库根目录（非递归），`lib/` 从未被扫过——上面那条提示就是这样漏出去的。现在递归扫 `lib/`、`skills/`、`docs/`、`locale/`、`test/`，先剥掉注释（迁移说明里允许写 `(was d365_health)`），并跳过两份 CHANGELOG。
+- skill 只查 `description`，现在连正文一起查——工具名正是在正文里。
+- 查询参数的测试原本假设只发一次请求，现在断言重试只去掉 `$top`、保留 `$filter` / `$orderby` / `$select`。
+
+**locale 文件不再漂移**
+- `locale/en.json` 与 `locale/zh.json` 里还留着 `d365_configure`、`d365_health`，却缺了五个已发布的工具。现在正好是注册的 18 个名字。（没有代码 import 这两个文件，它们是随包分发的数据。）
+
+**其他**
+- `d365_data` 的 `count` / `group` 在答案很短时不落盘，文档不再承诺每个结果都有文件路径。
+- `d365_code_check` 读 `EntityDefinitions` 时不带 `$top`；以前它会吞掉这个拒绝、报「读不到表清单」。
+
 ## 0.37.0
 
 二十一个工具收成十八个，每个描述都补上一句「它不是用来做什么的」。这一版改的是工具名，任何写死旧名的地方（agent 预设、自己的提示词、收藏的命令）都要改。

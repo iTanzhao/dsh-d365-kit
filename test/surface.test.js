@@ -96,14 +96,17 @@ test('the tools that write say they need permission', async () => {
   }
 })
 
-test('the packaged skills load, and no skill names a removed tool', async () => {
+test('the packaged skills load, and no skill text names a removed tool', async () => {
   const skills = bundledSkills()
   assert.equal(skills.length, 2)
+  const removed = ['d365_write', 'd365_sync', 'd365_access', 'd365_trace', 'd365_perf', 'd365_health', 'd365_configure']
   for (const skill of skills) {
     assert.ok(skill.name)
     assert.ok(skill.description)
-    for (const old of ['d365_write', 'd365_sync', 'd365_access', 'd365_trace', 'd365_perf', 'd365_health', 'd365_configure']) {
-      assert.ok(!new RegExp(`\\b${old}\\b`).test(skill.description ?? ''), `${skill.name} names ${old}`)
+    // The body routes the model to tools, so the body has to be checked too —
+    // the description alone stayed clean while `perf.js` text went stale.
+    for (const old of removed) {
+      assert.ok(!new RegExp(`\\b${old}\\b`).test(skill.content ?? ''), `${skill.name} names ${old}`)
     }
   }
 
@@ -131,14 +134,31 @@ test('the browser half loads through the client module loader', async () => {
 
 test('no source file still points at a removed tool name', async () => {
   const removed = ['d365_write', 'd365_sync', 'd365_access', 'd365_trace', 'd365_perf', 'd365_health', 'd365_configure']
+  // Comments explain the rename (`(was d365_health)`), so they are allowed to
+  // mention the old names; code, docs and skills are not.
+  const strip = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
   const files = []
-  for (const file of await readdir(root, { withFileTypes: true })) {
-    if (file.isFile() && /\.(js|json|yml|md)$/.test(file.name) && file.name !== 'CHANGELOG.md' && file.name !== 'CHANGELOG.zh-CN.md') {
-      files.push(join(root, file.name))
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) {
+        await walk(path)
+      } else if (/\.(js|json|yml|md)$/.test(entry.name) && !/^CHANGELOG/.test(entry.name)) {
+        files.push(path)
+      }
     }
   }
+  // `lib/` was never scanned before, which is how a stale `d365_health` hint
+  // survived in `perf.js`.
+  for (const directory of ['lib', 'skills', 'docs', 'locale', 'test']) await walk(join(root, directory))
+  for (const file of await readdir(root, { withFileTypes: true })) {
+    if (file.isFile() && /\.(js|json|yml|md)$/.test(file.name) && !/^CHANGELOG/.test(file.name)) files.push(join(root, file.name))
+  }
+  const self = join(root, 'test', 'surface.test.js')
   for (const file of files) {
-    const source = await readFile(file, 'utf8')
+    if (file === self) continue
+    const source = strip(await readFile(file, 'utf8'))
     for (const old of removed) {
       assert.ok(!new RegExp(`\\b${old}\\b`).test(source), `${file} still mentions ${old}`)
     }
