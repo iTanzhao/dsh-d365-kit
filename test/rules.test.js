@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { getPagedWithSelectFallback } from '../lib/client.js'
+import { getPagedWithSelectFallback, retryDelay } from '../lib/client.js'
 import { D365Error } from '../lib/errors.js'
 import { compareVersion } from '../lib/contract.js'
-import { ownerLookup } from '../lib/data-migrate.js'
+import { claimMigrationPlan, deleteMigrationPlan, executeMigration, executeUpdate, ownerLookup, readMigrationPlan, releaseMigrationPlan, saveMigrationPlan } from '../lib/data-migrate.js'
+import { parseMergeRequestUrl } from '../lib/gitlab.js'
+import { redact } from '../lib/tool-trace.js'
 import { keyedRows } from '../lib/resources.js'
 import { recordKey } from '../lib/tool-data.js'
 import { writeTotals } from '../lib/tool-data-sync.js'
-import { artifactRoot, mapEnvironments, writeArtifact } from '../lib/runtime.js'
+import { artifactRoot, compareEnvironments, mapEnvironments, writeArtifact } from '../lib/runtime.js'
+import { groupDurations, stageSteps } from '../lib/perf.js'
+import { flattenActions } from '../lib/tool-flows.js'
+import { scanLines } from '../lib/tool-reports.js'
+import { ATTRIBUTE_TYPES } from '../lib/write-actions.js'
+import { writeFile } from 'node:fs/promises'
 import { resolveLocale, translate, withLocale } from '../lib/i18n.js'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -146,6 +153,103 @@ test('writeArtifact stores compact JSON with one trailing newline', async () => 
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('GitLab merge request URLs require a credential-free HTTPS origin', () => {
+  assert.deepEqual(parseMergeRequestUrl('https://gitlab.example/g/p/-/merge_requests/42/diffs'), {
+    base: 'https://gitlab.example', project: 'g/p', iid: '42',
+  })
+  assert.equal(parseMergeRequestUrl('http://gitlab.example/g/p/-/merge_requests/42'), null)
+  assert.equal(parseMergeRequestUrl('https://token@gitlab.example/g/p/-/merge_requests/42'), null)
+})
+
+test('data plans allow exactly one atomic claimant', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'd365-kit-plan-'))
+  try {
+    const config = { workspaceDir: directory }
+    const plan = await saveMigrationPlan(config, { kind: 'data-update', environment: 'dev', values: {} })
+    assert.ok(await claimMigrationPlan(config, plan.id))
+    await assert.rejects(claimMigrationPlan(config, plan.id), (error) => error.code === 'plan-busy')
+    await releaseMigrationPlan(config, plan.id)
+    assert.ok(await claimMigrationPlan(config, plan.id))
+    await releaseMigrationPlan(config, plan.id)
+    assert.equal((await readMigrationPlan(config, plan.id)).status, 'pending')
+    await deleteMigrationPlan(config, plan.id)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('execution rejects an organization URL that changed after planning', async () => {
+  const config = { environments: { dev: { url: 'https://new.crm.dynamics.com' }, sit: { url: 'https://sit.crm.dynamics.com' } }, settings: {} }
+  await assert.rejects(executeUpdate(config, {
+    id: 'plan', environment: 'dev', url: 'https://old.crm.dynamics.com', before: [], values: {},
+  }, {}), (error) => error.code === 'environment-changed')
+  await assert.rejects(executeMigration(config, {
+    source: { key: 'dev', url: 'https://old.crm.dynamics.com' },
+    target: { key: 'sit', url: 'https://sit.crm.dynamics.com' },
+    options: {}, fields: [],
+  }, {}, undefined, {}), (error) => error.code === 'environment-changed')
+})
+
+test('redaction masks quoted connection-string secrets', () => {
+  const result = redact('Password="hello world"; Secret=\'a b\'; ClientSecret: "x y"')
+  assert.ok(!result.text.includes('hello world'))
+  assert.ok(!result.text.includes('a b'))
+  assert.ok(!result.text.includes('x y'))
+  assert.equal(result.count, 3)
+  assert.equal(redact('Authorization: Bearer abc.def').count, 1)
+})
+
+test('flow default branches participate in table-reference scans', () => {
+  const actions = { Switch: { type: 'Switch', default: { actions: { Fallback: { type: 'OpenApiConnection', inputs: { parameters: { entityName: 'account' } } } } } } }
+  assert.deepEqual(flattenActions(actions).map((item) => item.path), ['Switch', 'Switch (default) > Fallback'])
+})
+
+test('incomplete comparisons are visibly marked', () => {
+  const comparison = compareEnvironments('entities', [
+    { env: { key: 'dev' }, rows: [{ LogicalName: 'account' }], hasMore: true },
+    { env: { key: 'sit' }, rows: [{ LogicalName: 'account' }] },
+  ])
+  assert.deepEqual(comparison.incomplete, ['dev'])
+  assert.match(comparison.lines[0], /incomplete/i)
+})
+
+test('decimal and money precision preserve explicit zero', () => {
+  assert.equal(ATTRIBUTE_TYPES.decimal.extra({ precision: 0 }).Precision, 0)
+  assert.equal(ATTRIBUTE_TYPES.money.extra({ precision: 0 }).Precision, 0)
+})
+
+test('performance parsing ignores missing durations and handles real day/fraction timestamps', () => {
+  assert.equal(groupDurations([{ performanceexecutionduration: null }, { performanceexecutionduration: 7 }]).at(0).count, 1)
+  const trace = 'Time Stamp:- 11/30/2026 23:59:59.9\nMessage:- A\nTime Stamp:- 12/02/2026 00:00:00.1\nMessage:- B\n06:10:25.1 C'
+  const { steps } = stageSteps(trace)
+  assert.equal(steps[0].delta, 86_400_200)
+})
+
+test('streamed long-line search finds a match beyond the retained prefix', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'd365-kit-lines-'))
+  const file = join(directory, 'long.json')
+  try {
+    await writeFile(file, 'x'.repeat(5000) + 'needle\n', 'utf8')
+    const lines = []
+    for await (const item of scanLines(file, 32, 'needle')) lines.push(item)
+    assert.equal(lines[0].matched, true)
+    assert.equal(lines[0].text.length, 32)
+    assert.equal(lines[0].dropped, 4974)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('Retry-After supports HTTP dates and numeric delay', () => {
+  const numeric = { headers: new Map([['retry-after', '3']]) }
+  numeric.headers.get = (key) => key === 'retry-after' ? '3' : null
+  assert.equal(retryDelay(numeric, 1), 3000)
+  const future = Date.now() + 5000
+  const dated = { headers: { get: () => new Date(future).toUTCString() } }
+  const delay = retryDelay(dated, 1)
+  assert.ok(delay >= 3000 && delay <= 5000)
 })
 
 test('locale fallback is English and request locale is isolated concurrently', async () => {

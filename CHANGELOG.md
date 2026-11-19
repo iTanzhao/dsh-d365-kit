@@ -4,6 +4,53 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor. While the package is 0.x, a rename or a changed tool surface also bumps the minor, and the section starts with **Breaking**.
 
+## 0.38.0
+
+Tool output is no longer hard-coded Chinese, and the write paths stopped trusting the plan file they read a moment ago.
+
+**English output by default, Chinese when asked for**
+
+- Every message a tool prints — table headers, status lines, hints, notes, error text — now comes from `locale/<language>/` (`runtime.json`, `settings.json`, `reports.json`, `client.json`). `lib/i18n.js` resolves the active language per tool call through `AsyncLocalStorage`, so two environments or two conversations can run in different languages without crossing.
+- The default is English; the settings page and `state.locale` decide the rest. Tool descriptions are English too, which is what the model routes on.
+- Errors carry an `i18nKey` and are rendered through the same table (`localizeError`), so a failure reads in the same language as the report that triggered it.
+
+**A plan cannot be executed twice, or against a different organization**
+
+- `d365_data_sync execute` now takes a `.lock` next to the plan (`claimMigrationPlan` / `releaseMigrationPlan`). A second window gets `plan-busy` instead of writing the same rows twice.
+- The plan is re-read **after** the confirmation card and must still be `pending`; the status write is conditional (`pending → running`), so a plan that was cancelled or already executed in another window cannot start.
+- Both the source and target URLs are compared against the plan (`environment-changed`). Editing `d365.config.json` to point at another org between review and execute now refuses instead of writing into whatever is configured now.
+- A failure before the rows are reached no longer moves the plan to `failed`; only a plan actually marked `running` is failed.
+
+**Fewer ways for a migration to look right and be wrong**
+
+- When records in one batch reference each other, the batch now runs sequentially. Writing them concurrently could bind a child to a parent that had not been created yet, and the run report would still say "0 failed".
+- Owner matching collects every candidate and treats more than one match as `ambiguous` instead of taking the first row.
+- `onMissingLookup: "null"` really writes `null` (both on create and in the deferred pass) instead of leaving the column unset.
+- Batch updates check `IsValidForUpdate`, not `IsValidForCreate`; a create-only field is now refused up front rather than 400 per row.
+
+**Requests stay on the host they were configured for**
+
+- `@odata.nextLink` must stay on the configured origin and path — a page link pointing elsewhere is refused (`unsafe-next-link`).
+- GitLab reads are pinned to the configured HTTPS origin; cross-host merge-request links and redirects are refused, because the token travels in a header.
+- Authentication failures keep their own message and hint instead of being rewrapped as "network error".
+- Retry waits honor an HTTP-date `Retry-After`, add jitter, and abort with the caller's signal.
+
+**Diagnostics that stop overstating themselves**
+
+- `d365_diagnose perf-*` ignores rows without a duration and drops the `NaN` buckets they used to create.
+- `trace-stages` handles both `Time Stamp:` lines and a bare clock, day rollovers by date, and millisecond fractions of any length.
+- Multi-environment comparisons say which environments were truncated or failed instead of printing "no differences" over an incomplete read.
+- `d365_data group` says when the group list was cut at the row limit.
+
+**Smaller**
+
+- `d365_code_check` caps files, findings and questions per report with an explicit "... N more" line, so a large MR no longer produces a wall of text.
+- `d365_reports view` matches across chunk boundaries in large artifacts, so a `match` near a 256 KB boundary is found.
+- Trace redaction masks quoted values (`"Password": "..."`) as well as unquoted ones.
+- `d365_flows show` by name refuses when two flows share the name and points at `flowId`.
+- View layout edits handle non-self-closing `<cell>` elements, and switch `default` branches appear in a flow's step list.
+- Fixed a missing dictionary key (`csharp.assemblyMissingCandidates`) that printed the raw key in the "no such assembly" finding.
+
 ## 0.37.1
 
 A correctness pass over 0.37.0's own surface: one of its changes would have made four tools fail outright, and its "no stale tool name" test was looking in the wrong place.
