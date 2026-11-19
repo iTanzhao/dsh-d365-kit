@@ -1,6 +1,6 @@
 {
   "name": "dsh-d365-kit",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js"

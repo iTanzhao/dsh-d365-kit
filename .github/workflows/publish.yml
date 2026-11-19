@@ -109,8 +109,11 @@ jobs:
       # A rejection is re-checked against the registry before failing: another run
       # (or an earlier attempt) may have published the same version in the seconds
       # since `Already on the registry?` ran. That is a success, not a red build.
+      # Only main publishes: `npm publish` sets the `latest` dist-tag, and a tag
+      # push for an older version would move `latest` backwards. Tag pushes run
+      # the checks above and then report whether the version is on the registry.
       - name: Publish with trusted publishing
-        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'oidc'
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'oidc' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         run: |
           npm config delete //registry.npmjs.org/:_authToken || true
           set +e
@@ -132,7 +135,7 @@ jobs:
           fi
 
       - name: Publish with a token
-        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'token'
+        if: steps.check.outputs.published == 'false' && steps.auth.outputs.mode == 'token' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -150,6 +153,12 @@ jobs:
             done
             exit "$status"
           fi
+
+      - name: Tag pushes do not publish
+        if: startsWith(github.ref, 'refs/tags/') && steps.check.outputs.published == 'false'
+        run: |
+          echo "::notice::tag v${{ steps.version.outputs.value }} is not on the registry; only pushes to main publish, because publishing also moves the latest dist-tag."
+          echo "::notice::to publish this version, put it on main (or run this workflow manually)."
 
       - name: What to check when the publish is rejected
         if: failure() && steps.check.outputs.published == 'false'

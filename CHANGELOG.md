@@ -4,6 +4,13 @@
 
 Versioning: bug fixes bump the patch, new tools/capabilities bump the minor. While the package is 0.x, a rename or a changed tool surface also bumps the minor, and the section starts with **Breaking**.
 
+## 0.38.1
+
+Only pushes to `main` publish now. `npm publish` sets the `latest` dist-tag, so pushing an older `v*` tag after a newer release moved `latest` backwards — pushing `v0.36.0` and `v0.37.1` alongside `main` left `latest` on `0.37.1` while `0.38.0` sat published-but-unreachable.
+
+- The publish steps require `refs/heads/main` (or a manual dispatch). A tag push still checks that the tag matches `package.json` and that the files parse, then reports whether the version is on the registry instead of publishing it.
+- `README` / `INSTALL` / installation docs describe the same rule: tags are for marking a release, `main` is what publishes.
+
 ## 0.38.0
 
 Tool output is no longer hard-coded Chinese, and the write paths stopped trusting the plan file they read a moment ago.
