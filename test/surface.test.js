@@ -90,7 +90,7 @@ test('the tools that write say they need permission', async () => {
   for (const tool of writes) {
     assert.match(
       tool.description,
-      /权限|授权|data\.(read|write)|message\.invoke|role\.admin/,
+      /permission|authorized|capability|data\.(read|write)|message\.invoke|role\.admin/i,
       `${tool.name} never says what it needs permission for`,
     )
   }
@@ -124,6 +124,41 @@ test('the locale files carry the same keys', async () => {
       : [`${prefix}${key}`]
   ))
   assert.deepEqual(keys(zh).sort(), keys(en).sort())
+})
+
+test('every runtime locale dictionary carries the same keys', async () => {
+  const dictionaries = {}
+  for (const language of ['en', 'zh']) {
+    const files = {}
+    const entries = await readdir(join(root, 'locale', language), { withFileTypes: true })
+    for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
+      const value = JSON.parse(await readFile(join(root, 'locale', language, entry.name), 'utf8'))
+      files[entry.name] = Object.keys(value).sort()
+    }
+    dictionaries[language] = files
+  }
+  assert.deepEqual(Object.keys(dictionaries.zh).sort(), Object.keys(dictionaries.en).sort())
+  for (const name of Object.keys(dictionaries.en)) {
+    assert.deepEqual(dictionaries.zh[name], dictionaries.en[name], name)
+  }
+})
+
+test('JavaScript source contains no Han characters outside locale resources', async () => {
+  const files = []
+  const walk = async (directory) => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) await walk(path)
+      else if (entry.name.endsWith('.js')) files.push(path)
+    }
+  }
+  await walk(root)
+  for (const file of files) {
+    const relative = file.slice(root.length).replaceAll('\\', '/')
+    if (relative.startsWith('locale/zh/')) continue
+    assert.doesNotMatch(await readFile(file, 'utf8'), /[\u3400-\u9FFF]/, file)
+  }
 })
 
 test('the browser half loads through the client module loader', async () => {

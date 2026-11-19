@@ -8,6 +8,7 @@ import { keyedRows } from '../lib/resources.js'
 import { recordKey } from '../lib/tool-data.js'
 import { writeTotals } from '../lib/tool-data-sync.js'
 import { artifactRoot, mapEnvironments, writeArtifact } from '../lib/runtime.js'
+import { resolveLocale, translate, withLocale } from '../lib/i18n.js'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -145,6 +146,28 @@ test('writeArtifact stores compact JSON with one trailing newline', async () => 
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('locale fallback is English and request locale is isolated concurrently', async () => {
+  const key = 'runtime.cost'
+  assert.equal(translate(key, { requests: 2, seconds: '1.0' }, 'zh'), '\uFF082 \u8BF7\u6C42 / 1.0s\uFF09')
+  assert.equal(translate('missing.translation.key', undefined, 'zh'), 'missing.translation.key')
+  assert.equal(translate('write.approve', undefined, 'zh'), '\u{6279}\u{51C6}\u{6267}\u{884C}')
+  assert.match(translate('write.noOptions', { count: 3 }, 'zh'), /3/)
+  assert.match(translate('perf.analysisFailed', { environment: 'dev' }, 'zh'), /dev/)
+  assert.match(translate('snapshot.heading', { environments: 'dev / sit' }, 'zh'), /dev \/ sit/)
+  const values = await Promise.all([
+    withLocale('zh', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return [resolveLocale(), translate(key, { requests: 1, seconds: '0.1' })]
+    }),
+    withLocale('en', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      return [resolveLocale(), translate(key, { requests: 1, seconds: '0.1' })]
+    }),
+  ])
+  assert.deepEqual(values[0], ['zh', '\uFF081 \u8BF7\u6C42 / 0.1s\uFF09'])
+  assert.deepEqual(values[1], ['en', '(1 requests / 0.1s)'])
 })
 
 test('a rejected query option is retried once without $top, then surfaced', async () => {

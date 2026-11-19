@@ -29,7 +29,7 @@
  * approved; business record writes live in `lib/tool-data-write.js`, are gated
  * by `data.write`, and always ask for confirmation first.
  *
- * The Web UI half contributes a settings page ("D365 工具箱") that saves through
+ * The Web UI half contributes a settings page ("D365 Toolkit") that saves through
  * the same `lib/settings-store.js` functions as `d365_envs`, and reaches the
  * Host through the routes in `lib/settings-http.js`.
  */
@@ -55,6 +55,7 @@ import { registerRoutes } from './lib/settings-http.js'
 import { registerSkills } from './lib/skill.js'
 import { setCapabilityResolver, setDataReadResolver, setDataWriteResolver, setMetadataReadResolver } from './lib/client.js'
 import { makeAnyCapabilityResolver, makeDataReadResolver, makeDataWriteResolver, makeMetadataReadResolver } from './lib/data-policy.js'
+import { localizeTool } from './lib/i18n.js'
 
 export const name = 'dsh-d365-kit'
 
@@ -70,7 +71,7 @@ let routesAttached = false
  * @param config - the `config` block from cordis.patch.yml.
  */
 export function apply(ctx, config = {}) {
-  const state = { rawConfig: config ?? {} }
+  const state = { rawConfig: config ?? {}, locale: 'en' }
 
   // Every request consults the policy file: metadata reads, business-record
   // reads and writes are separate capabilities granted per environment.
@@ -79,25 +80,35 @@ export function apply(ctx, config = {}) {
   setDataWriteResolver(makeDataWriteResolver(() => state.rawConfig))
   setCapabilityResolver(makeAnyCapabilityResolver(() => state.rawConfig))
 
+  const toolContext = {
+    ...ctx,
+    tools: {
+      ...ctx.tools,
+      register(definition) {
+        return ctx.tools.register(localizeTool(definition, state))
+      },
+    },
+  }
+
   const disposers = [
-    registerEnvironments(ctx, state),
-    registerMetadata(ctx, state),
-    registerLayers(ctx, state),
-    registerSync(ctx, state),
-    registerDiff(ctx, state),
-    registerWrite(ctx, state),
-    registerMigrate(ctx, state),
-    registerCodeCheck(ctx, state),
-    registerRefs(ctx, state),
-    registerData(ctx, state),
-    registerDataWrite(ctx, state),
-    registerAccess(ctx, state),
-    registerDataSync(ctx, state),
-    registerInvoke(ctx, state),
-    registerDiagnose(ctx, state),
-    registerFlows(ctx, state),
-    registerContract(ctx, state),
-    registerReports(ctx, state),
+    registerEnvironments(toolContext, state),
+    registerMetadata(toolContext, state),
+    registerLayers(toolContext, state),
+    registerSync(toolContext, state),
+    registerDiff(toolContext, state),
+    registerWrite(toolContext, state),
+    registerMigrate(toolContext, state),
+    registerCodeCheck(toolContext, state),
+    registerRefs(toolContext, state),
+    registerData(toolContext, state),
+    registerDataWrite(toolContext, state),
+    registerAccess(toolContext, state),
+    registerDataSync(toolContext, state),
+    registerInvoke(toolContext, state),
+    registerDiagnose(toolContext, state),
+    registerFlows(toolContext, state),
+    registerContract(toolContext, state),
+    registerReports(toolContext, state),
   ]
 
   ctx.effect(() => () => {

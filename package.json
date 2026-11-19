@@ -32,6 +32,8 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
+    "./locale/en/*.json": "./locale/en/*.json",
+    "./locale/zh/*.json": "./locale/zh/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
@@ -49,6 +51,7 @@
     "skills/**",
     "examples/**",
     "locale/*.json",
+    "locale/*/*.json",
     "icon.svg"
   ],
   "dsh": {

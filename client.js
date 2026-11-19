@@ -1,5 +1,5 @@
 /**
- * Client half: the "D365 工具箱" settings page, split into tabs.
+ * Client half: the D365 Toolkit settings page, split into tabs.
  *
  *   Environments  the environment list, secrets, default environment
  *   Permissions   which capabilities are granted to which environment
@@ -26,295 +26,150 @@ window.__ModuleLoader__.load({
     const WRITE_HEADERS = { 'content-type': 'application/json', 'x-d365-meta-write': '1' }
 
     const DICT = {
-      en: {
-        'section.title': 'D365 Toolkit',
-        'section.desc': 'Connect Dataverse environments, manage read/write permissions and pending changes, review local data and check results.',
-        'tab.environments': 'Environments',
-        'tab.permissions': 'Permissions',
-        'tab.plans': 'Pending changes',
-        'tab.data': 'Data',
-        'tab.general': 'General',
-        'data.title': 'Local data',
-        'data.desc': 'Snapshots, reports and query artifacts are stored on this machine. This page shows what is using space and applies the retention policy.',
-        'data.total': 'Total',
-        'data.class': 'Class',
-        'data.count': 'Files',
-        'data.size': 'Size',
-        'data.policy': 'Retention',
-        'data.keepPolicy': 'keep {keep} / {days} days',
-        'data.overLimit': 'over {mb} MB — consider cleaning up',
-        'data.cleanup': 'Preview cleanup',
-        'data.compact': 'Compact snapshots',
-        'data.plan': 'Will delete {files} files and free {size}.',
-        'data.confirm': 'Delete now',
-        'data.deleted': 'Deleted {files} files, freed {size}.',
-        'data.compacted': 'Compacted {snapshots} snapshots, freed {size}.',
-        'data.nothing': 'Nothing to clean up under the current policy.',
-        'data.failed': 'Failed: {error}',
-        'add': 'Add environment',
-        'save': 'Save',
-        'saving': 'Saving…',
-        'test': 'Test connection',
-        'testing': 'Testing…',
-        'remove': 'Remove',
-        'label': 'Display name',
-        'url': 'Environment URL',
-        'cloud': 'Cloud',
-        'tenantId': 'Tenant ID',
-        'clientId': 'Application user ClientId',
-        'secret': 'Client secret',
-        'secretSaved': 'Secret saved (source: {source})',
-        'clear': 'Remove saved secret',
-        'secretHint': 'The secret is written to the local d365.secrets.json in plain text, never to d365.config.json. Keep that file out of Git.',
-        'default': 'Default environment',
-        'saved': 'Saved.',
-        'savedSecrets': 'Saved; the secret went to d365.secrets.json.',
-        'loadFailed': 'Could not load the configuration: {error}',
-        'refreshFailed': 'Could not refresh: {error} — retrying.',
-        'retry': 'Retry',
-        'saveFailed': 'Could not save: {error}',
-        'checkOk': 'Connected: {name} ({version})',
-        'checkFail': 'Connection failed: {error}',
-        'checkMissing': 'Missing credentials: {list}',
-        'checkStale': 'Credentials changed — test again.',
-        'issues': 'Configuration warnings',
-        'files': 'Config: {config}',
-        'secretFile': 'Secrets: {secrets}',
-        'empty': 'No environments yet. Start with "Add environment".',
-        'urlRequired': 'Fill in the URL for "{key}" first.',
-        'duplicate': 'Duplicate key: {key}',
-        'existing': 'already saved',
-        'keyHint': 'Short key the tools use, e.g. dev.',
-        'keyRequired': 'The key cannot be empty.',
-        'keyInvalid': 'Key "{key}" may only contain letters, digits, "-" and "_".',
-        'write.title': 'Write permissions',
-        'write.desc': 'Choose what this machine may do in each environment. Metadata reads are on by default; business records need "Read business data". Metadata changes need a capability here and still require a confirm click.',
-        'write.gate': 'Every request is checked against the target environment\'s grants below before it leaves this machine; a tool cannot skip the check.',
-        'write.envSummary': '{granted} of {total} granted',
-        'write.envNote': 'Metadata (tables, fields, forms, views, plugins, solution layers) needs "Read metadata", ticked by default. Untick everything to block even metadata. Business records need "Read business data"; a write also needs its capability here plus a confirm click in the chat.',
-        'write.noEnvironments': 'Add an environment first.',
-        'write.solution': 'Default solution for changes',
-        'write.solutionHint': 'Solution unique name, so exported solutions carry the change',
-        'write.savePolicy': 'Save permissions',
-        'write.copyToAll': 'Copy to all environments',
-        'write.copied': 'Copied into the other environments — review, then save.',
-        'write.savedPolicy': 'Permissions saved.',
-        'write.saveFailed': 'Could not save: {error}',
-        'write.plans': 'Pending changes',
-        'write.plansDesc': 'Plans prepared by the agent. Nothing runs until you confirm here or in the chat.',
-        'write.noPlans': 'No pending changes. The agent can prepare one with d365_metadata_write.',
-        'write.execute': 'Review & execute',
-        'write.confirmExecute': 'Execute now',
-        'write.executing': 'Executing…',
-        'write.back': 'Cancel',
-        'write.cancelPlan': 'Discard plan',
-        'write.cancelling': 'Discarding…',
-        'write.warningTitle': 'This writes to a real environment',
-        'write.warningBody': 'The following operations will run against {env} immediately. Dataverse metadata changes cannot be rolled back automatically.',
-        'write.destructiveBody': 'This includes a deletion that cannot be undone: the column or option value is removed permanently. Check the names before confirming.',
-        'write.highRisk': 'destructive',
-        'write.executed': 'Done: {ok} succeeded, {failed} failed.',
-        'write.skipped': '{count} entries skipped (already present or unchanged).',
-        'write.publishing': ' Publishing in the background; the change becomes visible shortly.',
-        'write.recent': 'Recent changes',
-        'write.recentLine': '{time} · {env} · {ok} ok / {failed} failed',
-        'plans.more': '… {count} more',
-        'plans.statusRunning': 'running — or the last run was interrupted',
-        'plans.statusFailed': 'last run failed',
-        'plans.statusDone': 'already executed',
-        'plans.notPending': 'Only pending plans can be executed. Check .d365/changes for the run record, then discard this plan and prepare a new one.',
-        'plans.destructive': 'Destructive: deletes or removes metadata',
-        'write.publishRunning': 'publishing…',
-        'write.published': 'published',
-        'write.publishFailed': 'publish failed: {error}',
-        'write.publishSkipped': 'nothing to publish',
-        'write.republish': 'Publish again',
-        'write.republishing': 'Publishing…',
-        'write.republishOk': 'Published: {targets}',
-        'write.republishFailed': 'Publish failed: {error}',
-        'write.noTargets': 'nothing to publish',
-        'write.optionSetLabel': 'option set {name}',
-        'write.loadFailed': 'Could not load write settings: {error}',
-        'general.title': 'Tool parameters',
-        'general.desc': 'Numbers the tools use by default. They are stored in d365.config.json next to the environment list.',
-        'general.snapshotKeep': 'Snapshots kept per environment',
-        'general.snapshotKeepHint': 'Older snapshots are deleted after a sync. 1–50.',
-        'general.maxRecords': 'Default row limit',
-        'general.maxRecordsHint': 'Used when a tool call passes no value of its own. 1–100000.',
-        'general.timeoutMs': 'Request timeout (ms)',
-        'general.timeoutMsHint': 'Per HTTP request. 5000–300000.',
-        'general.dataDir': 'Local data directory',
-        'general.dataDirHint': 'Snapshots, diffs, pending writes and change records live here.',
-        'general.save': 'Save parameters',
-        'general.saved': 'Parameters saved.',
-        'general.loadFailed': 'Could not load parameters: {error}',
-        'tab.gitlab': 'GitLab',
-        'gitlab.title': 'GitLab',
-        'gitlab.desc': 'Used by d365_code_check to read a merge request and check its changed scripts against the environments. Read-only access is enough.',
-        'gitlab.url': 'GitLab base URL',
-        'gitlab.urlHint': 'For example https://gitlab.example.com — the page stays the same for every project.',
-        'gitlab.project': 'Default project',
-        'gitlab.projectHint': 'group/project. Used when the merge request link does not carry one.',
-        'gitlab.token': 'Access token',
-        'gitlab.tokenHint': 'A personal or project token with read_api. Saved to d365.secrets.json, never to d365.config.json.',
-        'gitlab.tokenSaved': 'A token is already saved ({source}). Leave empty to keep it.',
-        'gitlab.save': 'Save',
-        'gitlab.saved': 'Saved.',
-        'gitlab.check': 'Test access',
-        'gitlab.checking': 'Testing…',
-        'gitlab.ok': 'Connected as {user}.',
-        'gitlab.clear': 'Remove token',
-        'gitlab.cleared': 'Token removed.',
-        'gitlab.loadFailed': 'Could not load GitLab settings: {error}',
+      "en": {
+        "section.title": "D365 Toolkit",
+        "section.desc": "Connect Dataverse environments, manage read/write permissions and pending changes, review local data and check results.",
+        "tab.environments": "Environments",
+        "tab.permissions": "Permissions",
+        "tab.plans": "Pending changes",
+        "tab.data": "Data",
+        "tab.general": "General",
+        "data.title": "Local data",
+        "data.desc": "Snapshots, reports and query artifacts are stored on this machine. This page shows what is using space and applies the retention policy.",
+        "data.total": "Total",
+        "data.class": "Class",
+        "data.count": "Files",
+        "data.size": "Size",
+        "data.policy": "Retention",
+        "data.keepPolicy": "keep {keep} / {days} days",
+        "data.overLimit": "over {mb} MB — consider cleaning up",
+        "data.cleanup": "Preview cleanup",
+        "data.compact": "Compact snapshots",
+        "data.plan": "Will delete {files} files and free {size}.",
+        "data.confirm": "Delete now",
+        "data.deleted": "Deleted {files} files, freed {size}.",
+        "data.compacted": "Compacted {snapshots} snapshots, freed {size}.",
+        "data.nothing": "Nothing to clean up under the current policy.",
+        "data.failed": "Failed: {error}",
+        "add": "Add environment",
+        "save": "Save",
+        "saving": "Saving…",
+        "test": "Test connection",
+        "testing": "Testing…",
+        "remove": "Remove",
+        "label": "Display name",
+        "url": "Environment URL",
+        "cloud": "Cloud",
+        "tenantId": "Tenant ID",
+        "clientId": "Application user ClientId",
+        "secret": "Client secret",
+        "secretSaved": "Secret saved (source: {source})",
+        "clear": "Remove saved secret",
+        "secretHint": "The secret is written to the local d365.secrets.json in plain text, never to d365.config.json. Keep that file out of Git.",
+        "default": "Default environment",
+        "saved": "Saved.",
+        "savedSecrets": "Saved; the secret went to d365.secrets.json.",
+        "loadFailed": "Could not load the configuration: {error}",
+        "refreshFailed": "Could not refresh: {error} — retrying.",
+        "retry": "Retry",
+        "saveFailed": "Could not save: {error}",
+        "checkOk": "Connected: {name} ({version})",
+        "checkFail": "Connection failed: {error}",
+        "checkMissing": "Missing credentials: {list}",
+        "checkStale": "Credentials changed — test again.",
+        "issues": "Configuration warnings",
+        "files": "Config: {config}",
+        "secretFile": "Secrets: {secrets}",
+        "empty": "No environments yet. Start with \"Add environment\".",
+        "urlRequired": "Fill in the URL for \"{key}\" first.",
+        "duplicate": "Duplicate key: {key}",
+        "existing": "already saved",
+        "keyHint": "Short key the tools use, e.g. dev.",
+        "keyRequired": "The key cannot be empty.",
+        "keyInvalid": "Key \"{key}\" may only contain letters, digits, \"-\" and \"_\".",
+        "write.title": "Write permissions",
+        "write.desc": "Choose what this machine may do in each environment. Metadata reads are on by default; business records need \"Read business data\". Metadata changes need a capability here and still require a confirm click.",
+        "write.gate": "Every request is checked against the target environment's grants below before it leaves this machine; a tool cannot skip the check.",
+        "write.envSummary": "{granted} of {total} granted",
+        "write.envNote": "Metadata (tables, fields, forms, views, plugins, solution layers) needs \"Read metadata\", ticked by default. Untick everything to block even metadata. Business records need \"Read business data\"; a write also needs its capability here plus a confirm click in the chat.",
+        "write.noEnvironments": "Add an environment first.",
+        "write.solution": "Default solution for changes",
+        "write.solutionHint": "Solution unique name, so exported solutions carry the change",
+        "write.savePolicy": "Save permissions",
+        "write.copyToAll": "Copy to all environments",
+        "write.copied": "Copied into the other environments — review, then save.",
+        "write.savedPolicy": "Permissions saved.",
+        "write.saveFailed": "Could not save: {error}",
+        "write.plans": "Pending changes",
+        "write.plansDesc": "Plans prepared by the agent. Nothing runs until you confirm here or in the chat.",
+        "write.noPlans": "No pending changes. The agent can prepare one with d365_metadata_write.",
+        "write.execute": "Review & execute",
+        "write.confirmExecute": "Execute now",
+        "write.executing": "Executing…",
+        "write.back": "Cancel",
+        "write.cancelPlan": "Discard plan",
+        "write.cancelling": "Discarding…",
+        "write.warningTitle": "This writes to a real environment",
+        "write.warningBody": "The following operations will run against {env} immediately. Dataverse metadata changes cannot be rolled back automatically.",
+        "write.destructiveBody": "This includes a deletion that cannot be undone: the column or option value is removed permanently. Check the names before confirming.",
+        "write.highRisk": "destructive",
+        "write.executed": "Done: {ok} succeeded, {failed} failed.",
+        "write.skipped": "{count} entries skipped (already present or unchanged).",
+        "write.publishing": " Publishing in the background; the change becomes visible shortly.",
+        "write.recent": "Recent changes",
+        "write.recentLine": "{time} · {env} · {ok} ok / {failed} failed",
+        "plans.more": "… {count} more",
+        "plans.statusRunning": "running — or the last run was interrupted",
+        "plans.statusFailed": "last run failed",
+        "plans.statusDone": "already executed",
+        "plans.notPending": "Only pending plans can be executed. Check .d365/changes for the run record, then discard this plan and prepare a new one.",
+        "plans.destructive": "Destructive: deletes or removes metadata",
+        "write.publishRunning": "publishing…",
+        "write.published": "published",
+        "write.publishFailed": "publish failed: {error}",
+        "write.publishSkipped": "nothing to publish",
+        "write.republish": "Publish again",
+        "write.republishing": "Publishing…",
+        "write.republishOk": "Published: {targets}",
+        "write.republishFailed": "Publish failed: {error}",
+        "write.noTargets": "nothing to publish",
+        "write.optionSetLabel": "option set {name}",
+        "write.loadFailed": "Could not load write settings: {error}",
+        "general.title": "Tool parameters",
+        "general.desc": "Numbers the tools use by default. They are stored in d365.config.json next to the environment list.",
+        "general.snapshotKeep": "Snapshots kept per environment",
+        "general.snapshotKeepHint": "Older snapshots are deleted after a sync. 1–50.",
+        "general.maxRecords": "Default row limit",
+        "general.maxRecordsHint": "Used when a tool call passes no value of its own. 1–100000.",
+        "general.timeoutMs": "Request timeout (ms)",
+        "general.timeoutMsHint": "Per HTTP request. 5000–300000.",
+        "general.dataDir": "Local data directory",
+        "general.dataDirHint": "Snapshots, diffs, pending writes and change records live here.",
+        "general.save": "Save parameters",
+        "general.saved": "Parameters saved.",
+        "general.loadFailed": "Could not load parameters: {error}",
+        "tab.gitlab": "GitLab",
+        "gitlab.title": "GitLab",
+        "gitlab.desc": "Used by d365_code_check to read a merge request and check its changed scripts against the environments. Read-only access is enough.",
+        "gitlab.url": "GitLab base URL",
+        "gitlab.urlHint": "For example https://gitlab.example.com — the page stays the same for every project.",
+        "gitlab.project": "Default project",
+        "gitlab.projectHint": "group/project. Used when the merge request link does not carry one.",
+        "gitlab.token": "Access token",
+        "gitlab.tokenHint": "A personal or project token with read_api. Saved to d365.secrets.json, never to d365.config.json.",
+        "gitlab.tokenSaved": "A token is already saved ({source}). Leave empty to keep it.",
+        "gitlab.save": "Save",
+        "gitlab.saved": "Saved.",
+        "gitlab.check": "Test access",
+        "gitlab.checking": "Testing…",
+        "gitlab.ok": "Connected as {user}.",
+        "gitlab.clear": "Remove token",
+        "gitlab.cleared": "Token removed.",
+        "gitlab.loadFailed": "Could not load GitLab settings: {error}"
       },
-      zh: {
-        'section.title': 'D365 工具箱',
-        'section.desc': '接入 Dataverse 环境，管理读写权限与待确认变更，查看本机数据与检查结果。',
-        'tab.environments': '环境',
-        'tab.permissions': '权限',
-        'tab.plans': '计划',
-        'tab.data': '数据',
-        'tab.general': '常规',
-        'data.title': '本机数据',
-        'data.desc': '快照、报告与查询留证都存在本机。这里显示占用情况，并按保留策略清理。',
-        'data.total': '合计',
-        'data.class': '类别',
-        'data.count': '文件',
-        'data.size': '占用',
-        'data.policy': '保留策略',
-        'data.keepPolicy': '保留 {keep} 个 / {days} 天',
-        'data.overLimit': '超过 {mb} MB，建议清理',
-        'data.cleanup': '预演清理',
-        'data.compact': '压缩快照',
-        'data.plan': '将删除 {files} 个文件，释放 {size}。',
-        'data.confirm': '确认删除',
-        'data.deleted': '已删除 {files} 个文件，释放 {size}。',
-        'data.compacted': '已压缩 {snapshots} 份快照，释放 {size}。',
-        'data.nothing': '按当前策略没有需要清理的内容。',
-        'data.failed': '操作失败：{error}',
-        'add': '添加环境',
-        'save': '保存',
-        'saving': '保存中…',
-        'test': '测试连接',
-        'testing': '测试中…',
-        'remove': '删除',
-        'label': '显示名',
-        'url': '环境 URL',
-        'cloud': '云',
-        'tenantId': '租户 ID',
-        'clientId': '应用用户 ClientId',
-        'secret': '客户端密钥',
-        'secretSaved': '密钥已保存（来源：{source}）',
-        'clear': '清除已保存的密钥',
-        'secretHint': '密钥以明文写入本机 d365.secrets.json，不会写进 d365.config.json；别把它提交到 Git。',
-        'default': '默认环境',
-        'saved': '已保存。',
-        'savedSecrets': '已保存，密钥写入了 d365.secrets.json。',
-        'loadFailed': '读取配置失败：{error}',
-        'refreshFailed': '刷新失败：{error}，正在重试。',
-        'retry': '重试',
-        'saveFailed': '保存失败：{error}',
-        'checkOk': '连接正常：{name}（{version}）',
-        'checkFail': '连接失败：{error}',
-        'checkMissing': '缺少凭据：{list}',
-        'checkStale': '环境已修改，请重新测试。',
-        'issues': '配置告警',
-        'files': '配置文件：{config}',
-        'secretFile': '密钥文件：{secrets}',
-        'empty': '还没有环境，点"添加环境"开始。',
-        'urlRequired': '请先填写 "{key}" 的 URL。',
-        'duplicate': 'key 重复：{key}',
-        'existing': '已保存',
-        'keyHint': '工具里用的短名，例如 dev。',
-        'keyRequired': 'key 不能为空。',
-        'keyInvalid': 'key "{key}" 只能包含字母、数字、"-" 和 "_"。',
-        'write.title': '权限',
-        'write.desc': '选择这台机器可以对哪些环境做什么。元数据默认可读；读取业务数据需要勾「读取业务数据」；元数据修改需要先在这里授权，执行前仍要确认。',
-        'write.gate': '每一次访问在发出前都会按目标环境核对下面的勾选，任何工具都绕不过这道检查。',
-        'write.envSummary': '已授权 {granted}/{total}',
-        'write.envNote': '元数据（表、字段、表单、视图、插件、解决方案层）归「读取元数据」管，默认勾上；全部取消就什么都查不到。业务记录需要勾「读取业务数据」；写操作除勾选外，还要在对话里点确认。',
-        'write.noEnvironments': '请先添加环境。',
-        'write.solution': '变更默认解决方案',
-        'write.solutionHint': '解决方案唯一名：填了，导出的解决方案才会带上这次改动',
-        'write.savePolicy': '保存权限',
-        'write.copyToAll': '复制到其他环境',
-        'write.copied': '已复制到其他环境，核对后再保存。',
-        'write.savedPolicy': '权限已保存。',
-        'write.saveFailed': '保存失败：{error}',
-        'write.plans': '待确认的写入',
-        'write.plansDesc': 'agent 准备好的计划。在你确认之前，什么都不会执行。',
-        'write.noPlans': '没有待确认的变更。可以让 agent 用 d365_metadata_write 生成一个计划。',
-        'write.execute': '审阅并执行',
-        'write.confirmExecute': '确认执行',
-        'write.executing': '执行中…',
-        'write.back': '返回',
-        'write.cancelPlan': '丢弃计划',
-        'write.cancelling': '丢弃中…',
-        'write.warningTitle': '这是对真实环境的写入',
-        'write.warningBody': '以下操作会立即作用到 {env}。Dataverse 的元数据变更无法自动回滚，请先核对操作列表。',
-        'write.destructiveBody': '其中包含不可恢复的删除操作：被删的字段或选项值连同其数据一起消失，无法通过重新部署找回。确认前请核对名称。',
-        'write.highRisk': '高危',
-        'write.executed': '执行完成：成功 {ok} 个，失败 {failed} 个。',
-        'write.skipped': '跳过 {count} 条（已存在或无变化）。',
-        'write.publishing': '正在后台发布，稍后生效。',
-        'write.recent': '最近的变更记录',
-        'write.recentLine': '{time} · {env} · 成功 {ok} / 失败 {failed}',
-        'plans.more': '… 其余 {count} 个',
-        'plans.statusRunning': '正在执行，或上次执行中途中断',
-        'plans.statusFailed': '上次执行失败',
-        'plans.statusDone': '已经执行过',
-        'plans.notPending': '只有待确认的计划能执行。先到 .d365/changes 核对执行记录；要重做请丢弃这个计划并重新生成。',
-        'plans.destructive': '高危：会删除或移除元数据',
-        'write.publishRunning': '发布中…',
-        'write.published': '已发布',
-        'write.publishFailed': '发布失败：{error}',
-        'write.publishSkipped': '无需发布',
-        'write.republish': '重新发布',
-        'write.republishing': '发布中…',
-        'write.republishOk': '已发布：{targets}',
-        'write.republishFailed': '发布失败：{error}',
-        'write.noTargets': '无需发布',
-        'write.optionSetLabel': '选项集 {name}',
-        'write.loadFailed': '读取写入配置失败：{error}',
-        'general.title': '工具参数',
-        'general.desc': '工具默认使用的数值，和环境清单一起存在 d365.config.json 里。',
-        'general.snapshotKeep': '每个环境保留几份快照',
-        'general.snapshotKeepHint': '同步后删除更旧的快照。范围 1–50。',
-        'general.maxRecords': '单次返回行数上限',
-        'general.maxRecordsHint': '仅在工具调用自己没传值时生效。范围 1–100000。',
-        'general.timeoutMs': '请求超时（毫秒）',
-        'general.timeoutMsHint': '单个 HTTP 请求的超时。范围 5000–300000。',
-        'general.dataDir': '本地数据目录',
-        'general.dataDirHint': '快照、差异、待确认计划、变更记录都在这里。',
-        'general.save': '保存参数',
-        'general.saved': '参数已保存。',
-        'general.loadFailed': '读取参数失败：{error}',
-        'tab.gitlab': 'GitLab',
-        'gitlab.title': 'GitLab',
-        'gitlab.desc': '供 d365_code_check 读取 MR、把改动的脚本对照环境做检查。只需要只读权限。',
-        'gitlab.url': 'GitLab 地址',
-        'gitlab.urlHint': '例如 https://gitlab.example.com，各项目共用同一个页面地址。',
-        'gitlab.project': '默认项目',
-        'gitlab.projectHint': 'group/project。MR 链接里带项目时以链接为准。',
-        'gitlab.token': '访问令牌',
-        'gitlab.tokenHint': '勾了 read_api 的个人令牌或项目令牌。存在 d365.secrets.json，不会写进 d365.config.json。',
-        'gitlab.tokenSaved': '已有令牌（来源：{source}），留空表示不修改。',
-        'gitlab.save': '保存',
-        'gitlab.saved': '已保存。',
-        'gitlab.check': '测试访问',
-        'gitlab.checking': '测试中…',
-        'gitlab.ok': '连接正常，当前用户 {user}。',
-        'gitlab.clear': '删除令牌',
-        'gitlab.cleared': '令牌已删除。',
-        'gitlab.loadFailed': '读取 GitLab 设置失败：{error}',
-      },
+      "zh": {}
     }
 
-    /**
-     * The page translates from its own dictionary; the locale service only says
-     * *which* language is active. Using the service's lookup directly would turn
-     * one failed registration into a page of raw keys.
-     */
     let activeLocale = 'en'
     let localeService = null
     const localeListeners = new Set()
@@ -351,6 +206,29 @@ window.__ModuleLoader__.load({
       return activeLocale
     }
 
+    async function syncHostLocale(id = currentLocale()) {
+      try {
+        const response = await fetch('/api/d365-meta/locale', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-dsh-locale': id },
+          body: JSON.stringify({ locale: id }),
+        })
+        if (!response.ok) return
+        const payload = await response.json().catch(() => null)
+        const dictionaries = payload?.dictionaries
+        if (!dictionaries) return
+        if (dictionaries.en) DICT.en = { ...DICT.en, ...dictionaries.en }
+        if (dictionaries.zh) DICT.zh = { ...DICT.zh, ...dictionaries.zh }
+        notifyLocale()
+      } catch {
+        // UI translation remains functional if the Host is being reloaded.
+      }
+    }
+
+    function localizedHeaders(headers = {}) {
+      return { ...headers, 'x-dsh-locale': currentLocale() }
+    }
+
     function t(key, params) {
       const text = DICT[currentLocale()]?.[key] ?? DICT.en[key] ?? key
       if (!params) return text
@@ -372,7 +250,7 @@ window.__ModuleLoader__.load({
     /**
      * The Host puts the actionable half of an error in `hint` (which capability
      * to grant, where the run record lives). Keeping only `error` left messages
-     * like "计划正在执行" with nothing to do next.
+     * like "plan is running" with nothing to do next.
      */
     function errorText(data, response) {
       const error = data?.error ?? `HTTP ${response?.status ?? '?'}`
@@ -689,7 +567,7 @@ window.__ModuleLoader__.load({
         setLoading(true)
         try {
           const response = await fetch('/api/d365-meta/config', {
-            headers: { accept: 'application/json' },
+            headers: localizedHeaders({ accept: 'application/json' }),
             signal: run.signal,
           })
           const data = await readBody(response)
@@ -835,7 +713,7 @@ window.__ModuleLoader__.load({
         try {
           const response = await fetch('/api/d365-meta/check', {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: localizedHeaders({ 'content-type': 'application/json' }),
             body: JSON.stringify({ key }),
           })
           const data = await readBody(response)
@@ -1088,7 +966,7 @@ window.__ModuleLoader__.load({
         const run = begin()
         try {
           const response = await fetch('/api/d365-meta/write/policy', {
-            headers: { accept: 'application/json' },
+            headers: localizedHeaders({ accept: 'application/json' }),
             signal: run.signal,
           })
           const policy = await readBody(response)
@@ -1359,7 +1237,7 @@ window.__ModuleLoader__.load({
         const run = begin()
         try {
           const response = await fetch('/api/d365-meta/write/plans', {
-            headers: { accept: 'application/json' },
+            headers: localizedHeaders({ accept: 'application/json' }),
             signal: run.signal,
           })
           const data = await readBody(response)
@@ -1699,7 +1577,7 @@ window.__ModuleLoader__.load({
         let alive = true
         ;(async () => {
           try {
-            const response = await fetch('/api/d365-meta/config', { headers: { accept: 'application/json' } })
+            const response = await fetch('/api/d365-meta/config', { headers: localizedHeaders({ accept: 'application/json' }) })
             const data = await readBody(response)
             if (!response.ok) throw new Error(errorText(data, response))
             if (!alive) return
@@ -1808,7 +1686,7 @@ window.__ModuleLoader__.load({
         let alive = true
         ;(async () => {
           try {
-            const response = await fetch('/api/d365-meta/config', { headers: { accept: 'application/json' } })
+            const response = await fetch('/api/d365-meta/config', { headers: localizedHeaders({ accept: 'application/json' }) })
             const data = await readBody(response)
             if (!response.ok) throw new Error(errorText(data, response))
             if (!alive) return
@@ -1959,7 +1837,7 @@ window.__ModuleLoader__.load({
       const [message, setMessage] = React.useState(null)
 
       const load = React.useCallback(async () => {
-        const response = await fetch('/api/d365-meta/storage', { headers: { accept: 'application/json' } })
+        const response = await fetch('/api/d365-meta/storage', { headers: localizedHeaders({ accept: 'application/json' }) })
         const data = await readBody(response)
         if (!response.ok) throw new Error(errorText(data, response))
         return data.storage
@@ -2193,6 +2071,7 @@ window.__ModuleLoader__.load({
           const sync = () => {
             const live = activeIdOf(locale)
             if (live) activeLocale = localeFrom(live)
+            syncHostLocale(activeLocale)
             notifyLocale()
           }
           sync()
